@@ -43,6 +43,36 @@ if os.path.isfile('env.json'):
         except:
             db_port = os.environ['DB_PORT']
 
+        try:
+            JWT_VERIFY = data["JWT_VERIFY"]
+        except:
+            JWT_VERIFY = os.environ["JWT_VERIFY"]
+        try:
+            JWT_VERIFY_EXPIRATION = data["JWT_VERIFY_EXPIRATION"]
+        except:
+            JWT_VERIFY_EXPIRATION = os.environ["JWT_VERIFY_EXPIRATION"]
+        try:
+            JWT_EXPIRATION_TIME = data["JWT_EXPIRATION_TIME"]
+        except:
+            JWT_EXPIRATION_TIME = os.environ["JWT_EXPIRATION_TIME"]
+        try:
+            JWT_AUTH_HEADER_PREFIX = data["JWT_AUTH_HEADER_PREFIX"]
+        except:
+            JWT_AUTH_HEADER_PREFIX = os.environ["JWT_AUTH_HEADER_PREFIX"]
+        try:
+            JWT_ALGORITHM = data["JWT_ALGORITHM"]
+        except:
+            JWT_ALGORITHM = os.environ["JWT_ALGORITHM"]
+        try:
+            JWT_PAYLOAD_HANDLER = data["JWT_PAYLOAD_HANDLER"]
+        except:
+            JWT_PAYLOAD_HANDLER = os.environ["JWT_PAYLOAD_HANDLER"]
+    
+        try:
+            APPLICATION_HOST = data["APPLICATION_HOST"]
+        except:
+            APPLICATION_HOST = os.environ["APPLICATION_HOST"]
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
@@ -56,6 +86,7 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -65,7 +96,43 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'adminapp',
+    'events',
+    'posts',
+    'users',
 ]
+
+# jwt setup
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
+}
+
+# JWT Authentication settings
+import datetime
+
+JWT_AUTH = {
+
+    'JWT_VERIFY': JWT_VERIFY,
+    'JWT_VERIFY_EXPIRATION': JWT_VERIFY_EXPIRATION,
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(seconds=int(JWT_EXPIRATION_TIME)),
+    'JWT_AUTH_HEADER_PREFIX': JWT_AUTH_HEADER_PREFIX,
+    'JWT_ALGORITHM': JWT_ALGORITHM,
+    'JWT_SECRET_KEY': SECRET_KEY,
+    'JWT_ALLOW_REFRESH': True,
+
+    'JWT_ENCODE_HANDLER': 'users.utils.jwt_encode_handler',
+    'JWT_DECODE_HANDLER': 'users.utils.jwt_decode_handler',
+    'JWT_PAYLOAD_HANDLER': 'users.utils.jwt_payload_handler',
+
+    'JWT_PAYLOAD_GET_USERNAME_HANDLER': 'users.utils.jwt_get_userid_from_payload_handler',
+
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -148,6 +215,7 @@ USE_L10N = True
 
 USE_TZ = True
 
+AUTH_USER_MODEL = 'users.CustomUser'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
