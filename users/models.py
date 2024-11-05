@@ -2,7 +2,7 @@ from django.db import models
 from adminapp.models import BaseModel,IUMaster
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.fields import JSONField,ArrayField
 from django.contrib.auth.models import AbstractUser, Group, Permission
 
 class CustomUser(AbstractUser,BaseModel):
@@ -63,3 +63,19 @@ class RoleMapping(models.Model):
 
     class Meta:
         db_table="role_mapping"
+
+class PublisherProfile(BaseModel):
+    user=models.ForeignKey(CustomUser,on_delete=models.CASCADE,related_name='publisher_user_id')
+    description=models.TextField(blank=True,null=True)
+    experience=models.TextField(blank=True,null=True)
+    document=ArrayField(JSONField(),default=list,blank=True)
+    website_link=models.TextField(blank=True,null=True)
+    approved_status=models.CharField(default='pending',max_length=50)
+    role_type=models.CharField(max_length=50,blank=True,null=True)
+    reason=models.TextField(blank=True,null=True)
+    is_rejected=models.BooleanField(default=False)
+    iu_id=models.ForeignKey(IUMaster,related_name='publisher_iu',on_delete = models.CASCADE)
+
+    class Meta:
+        db_table='publisher_profile'
+        ordering = ['created_at']
