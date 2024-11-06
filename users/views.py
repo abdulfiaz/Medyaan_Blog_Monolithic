@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from rest_framework import status
 from django.db.models import QuerySet
 from django.conf import settings    
-from users.serializers import CustomUserSerializer, UserPersonalProfileSerializer,GetCustomUserSerializer
+from users.serializers import CustomUserSerializer, UserPersonalProfileSerializer,GetCustomUserSerializer,PublisherProfileSerializer
 from adminapp.iudetail import get_iuobj
 from users.auth import get_user_roles
 from rest_framework.exceptions import AuthenticationFailed
@@ -116,7 +116,7 @@ class CreateCustomUserView(APIView):
         return Response({"users": user_data.data}, status=status.HTTP_200_OK)
         
     def post(self, request):
-        role_name = request.data.get('role_name', 'consumer')
+        role_name = request.data.get('role_type', 'consumer')
         user_role = get_user_roles(request)
 
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
@@ -129,15 +129,33 @@ class CreateCustomUserView(APIView):
         if user_role is None:
             role_name = 'consumer'
             
-        elif user_role != 'admin' and role_name in ['manager','eventorganizer']:
-            return Response({"status":"error","message":"only admin can create manager and eventorganiser !"},status=status.HTTP_401_UNAUTHORIZED)
-        elif user_role == 'consumer' and role_name == 'publisher' :
-                # logics
-            return Response({"status":"success","message": "Publisher created successfully!"}, status=status.HTTP_201_CREATED)
-        elif user_role == 'consumer' and role_name == 'eventorganizer':
-                # logics
-            return Response({"status":"success","message": "eventorganizer created successfully!"}, status=status.HTTP_201_CREATED)
+        elif user_role == 'consumer' and role_name in['publisher','eventorganiser'] :
+            transaction.set_autocommit(False)      
+            data=request.data
+            data['user']=request.user.id
+            data['created_by']=request.user.id
+            data['iu_id']=iu_master.id
+                        # user role mapping for publisher-->>
+            role = RoleMaster.objects.get(name=role_name)
+            publisher_prof=PublisherProfile.objects.filter(is_active=True,user=request.user,role_type=role.name,is_rejected=False)
+            if publisher_prof.exists():
+                return Response({"status":"error","message":f"You were already an {role_name} account"},status=status.HTTP_400_BAD_REQUEST)
+            
+            serializer=PublisherProfileSerializer(data=data)
+            if not serializer.is_valid():
+                return Response({"status":"success","message":serializer.errors},status=status.HTTP_403_FORBIDDEN)                
+            serializer.save()
 
+            try:
+                rolemap = RoleMapping.objects.get(user=request.user, role=role, iu_id=iu_master)
+            except RoleMapping.DoesNotExist:
+                rolemap = RoleMapping(user=request.user, role=role, iu_id=iu_master)
+                rolemap.save()
+            transaction.commit()
+            return Response({"status":"success","message": f"{role_name} created successfully!"}, status=status.HTTP_201_CREATED)
+        
+        elif user_role != 'admin' and role_name == 'manager':
+            return Response({"status":"error","message":"only admin can create manager and eventorganiser !"},status=status.HTTP_401_UNAUTHORIZED)
         transaction.set_autocommit(False)
         data=request.data
         data['iu_id']=iu_master.id
@@ -174,12 +192,12 @@ class CreateCustomUserView(APIView):
         
 
         user_profile_serializer = UserPersonalProfileSerializer(data=data_user)
-        
-        if user_profile_serializer.is_valid():
-            user_profile_serializer.save()
-            transaction.commit()
-            return Response({"status":"success","message": "User created successfully!"}, status=status.HTTP_201_CREATED)
-        else:
+        try:
+            if user_profile_serializer.is_valid():
+                user_profile_serializer.save()
+                transaction.commit()
+                return Response({"status":"success","message": "User created successfully!"}, status=status.HTTP_201_CREATED)
+        except:
             transaction.rollback()
             return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
              
@@ -210,23 +228,21 @@ class CreateCustomUserView(APIView):
 
         try:
             user_profile = UserPersonalProfile.objects.get(user=user,iu_id=iu_master)
+            data =request.data
+            data['modified_by']=request.user.id
+            user_profile_serializer = UserPersonalProfileSerializer(user_profile, data=data, partial=True)
+            
+            try:
+                if user_profile_serializer.is_valid():
+                    user_profile_serializer.save()
+                    transaction.commit()
+                    return Response({"status":"sucess","message": "User updated successfully!"}, status=status.HTTP_200_OK)
+                
+            except:
+                transaction.rollback()
+                return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except UserPersonalProfile.DoesNotExist:
             return Response({"status":"error","message": "User personal profile not found."}, status=status.HTTP_404_NOT_FOUND)
-        
-        data =request.data
-        data['modified_by']=request.user.id
-        user_profile_serializer = UserPersonalProfileSerializer(user_profile, data=data, partial=True)
-        
-        
-        if user_profile_serializer.is_valid():
-            user_profile_serializer.save()
-            transaction.commit()
-            return Response({"status":"sucess","message": "User updated successfully!"}, status=status.HTTP_200_OK)
-        
-        else:
-            transaction.rollback()
-            return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
    
     def delete(self, request):
         user_id = request.data.get('user_id',None)
@@ -234,9 +250,10 @@ class CreateCustomUserView(APIView):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         iu_master = get_iuobj(domain)
 
-        if user_role not in ['admin', 'manager'] :
+        if user_id is not None and user_role in ['admin', 'manager'] :
             return Response({'status':'error','message':"you are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
-
+        else:
+            user_id = request.user.id
         try:
             user = CustomUser.objects.get(id=user_id, iu_id=iu_master,is_active=True)
             user_profile = UserPersonalProfile.objects.get(user=user, iu_id=iu_master,is_active=True)
@@ -260,3 +277,6 @@ class CreateCustomUserView(APIView):
         else:
             return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class PublisherProfileView(APIView):
+    def get(self,request):
+        return

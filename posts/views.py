@@ -14,7 +14,7 @@ class PostCategoryView(APIView):
         category_id = request.query_params.get('category_id',None)
         user_role = get_user_roles(request)
         if user_role != 'admin':
-            return Response({"status":"error","message":"Only admin can view the category details !"},status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
         
         if category_id:
             try:
@@ -39,7 +39,7 @@ class PostCategoryView(APIView):
         user_role = get_user_roles(request)
         
         if user_role != 'admin':
-            return Response({"status":"error","message":"Only Admin can create PostCategory !"},status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
         
         transaction.set_autocommit(False)
         data=request.data
@@ -66,10 +66,10 @@ class PostCategoryView(APIView):
             return Response({"status":"error","message":"IU not found"},status=status.HTTP_404_NOT_FOUND)
 
         if user_role != 'admin':
-            return Response({"status":"success","message":"Only Admin has the access to modify the post  category !"},status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
         
         if not category_id:
-            return Response({"status":"success","message":"category_id is required"},status=status.HTTP_400_BAD_REQUEST)
+            return Response({"status":"error","message":"category_id is required"},status=status.HTTP_400_BAD_REQUEST)
         
         try:
             category_obj = PostCategory.objects.get(id=category_id,is_active=True,iu_id=iu_master)
@@ -101,7 +101,7 @@ class PostCategoryView(APIView):
                 return Response({"status":"error","message":"IU not found"},status=status.HTTP_404_NOT_FOUND)
 
             if user_role != 'admin':
-                return Response({"status":"error","message":"Only Admin has to access to delete the category"},status=status.HTTP_401_UNAUTHORIZED)
+                return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
             
             if not category_id:
                 return Response({"status":"error","message":"category_id is required"},status=status.HTTP_403_FORBIDDEN)

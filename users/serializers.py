@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from users.models import CustomUser, UserPersonalProfile, RoleMaster
+from users.models import CustomUser, UserPersonalProfile, RoleMaster,PublisherProfile
 from adminapp.models import IUMaster
 from django.contrib.auth.hashers import make_password,check_password
 
@@ -44,3 +44,7 @@ class GetCustomUserSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ['mobile_number', 'email', 'firstname', 'lastname','profilephoto', 'gender', 'age', 'language','primary_address', 'secondary_address']
 
+class PublisherProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=PublisherProfile
+        fiedls='__all__'
