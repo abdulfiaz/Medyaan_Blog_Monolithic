@@ -3,6 +3,7 @@ import jwt
  
 #To get the multiple roles for the user from token
 def get_user_roles(request):
+    roles = None 
     authorization_header = request.META.get('HTTP_AUTHORIZATION', None)
     if authorization_header:
         token = authorization_header.split(' ')[1]

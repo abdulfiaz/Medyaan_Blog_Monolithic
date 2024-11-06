@@ -174,12 +174,12 @@ class CreateCustomUserView(APIView):
         
 
         user_profile_serializer = UserPersonalProfileSerializer(data=data_user)
-        try:
-            if user_profile_serializer.is_valid():
-                user_profile_serializer.save()
-                transaction.commit()
-                return Response({"status":"success","message": "User created successfully!"}, status=status.HTTP_201_CREATED)
-        except:
+        
+        if user_profile_serializer.is_valid():
+            user_profile_serializer.save()
+            transaction.commit()
+            return Response({"status":"success","message": "User created successfully!"}, status=status.HTTP_201_CREATED)
+        else:
             transaction.rollback()
             return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
              
@@ -210,21 +210,23 @@ class CreateCustomUserView(APIView):
 
         try:
             user_profile = UserPersonalProfile.objects.get(user=user,iu_id=iu_master)
-            data =request.data
-            data['modified_by']=request.user.id
-            user_profile_serializer = UserPersonalProfileSerializer(user_profile, data=data, partial=True)
-            
-            try:
-                if user_profile_serializer.is_valid():
-                    user_profile_serializer.save()
-                    transaction.commit()
-                    return Response({"status":"sucess","message": "User updated successfully!"}, status=status.HTTP_200_OK)
-                
-            except:
-                transaction.rollback()
-                return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except UserPersonalProfile.DoesNotExist:
             return Response({"status":"error","message": "User personal profile not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        data =request.data
+        data['modified_by']=request.user.id
+        user_profile_serializer = UserPersonalProfileSerializer(user_profile, data=data, partial=True)
+        
+        
+        if user_profile_serializer.is_valid():
+            user_profile_serializer.save()
+            transaction.commit()
+            return Response({"status":"sucess","message": "User updated successfully!"}, status=status.HTTP_200_OK)
+        
+        else:
+            transaction.rollback()
+            return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
    
     def delete(self, request):
         user_id = request.data.get('user_id',None)
@@ -232,10 +234,9 @@ class CreateCustomUserView(APIView):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         iu_master = get_iuobj(domain)
 
-        if user_id is not None and user_role in ['admin', 'manager'] :
+        if user_role not in ['admin', 'manager'] :
             return Response({'status':'error','message':"you are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
-        else:
-            user_id = request.user.id
+
         try:
             user = CustomUser.objects.get(id=user_id, iu_id=iu_master,is_active=True)
             user_profile = UserPersonalProfile.objects.get(user=user, iu_id=iu_master,is_active=True)

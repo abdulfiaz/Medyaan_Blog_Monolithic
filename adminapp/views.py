@@ -8,7 +8,7 @@ from adminapp.models import IUMaster
 
 class IUMasterAPI(APIView):
     def get(self, request):
-        iu_id = request.query_params.get('id')
+        iu_id = request.query_params.get('iu_id')
         rolename = get_user_roles(request)
 
         if rolename != 'admin':
@@ -48,7 +48,7 @@ class IUMasterAPI(APIView):
             return Response({"status": "error", "message":  serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
-        iu_id = request.data.get('id')
+        iu_id = request.data.get('iu_id')
         rolename = get_user_roles(request)
 
         if rolename != "admin":
@@ -65,7 +65,6 @@ class IUMasterAPI(APIView):
         transaction.set_autocommit(False)
         data=request.data
         data['modified_by']=request.user.id
-        print("modify---->",data['modified_by'])
         serializer = IUMasterSerializer(iumaster, data=data, partial=True)
         
         if serializer.is_valid():
@@ -78,7 +77,7 @@ class IUMasterAPI(APIView):
             return Response({"status": "error", "message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request):
-        iu_id = request.data.get('id')
+        iu_id = request.data.get('iu_id')
         rolename = get_user_roles(request)
 
         if rolename != "admin":
