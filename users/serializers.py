@@ -47,4 +47,9 @@ class GetCustomUserSerializer(serializers.ModelSerializer):
 class PublisherProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model=PublisherProfile
-        fiedls='__all__'
+        fields='__all__'
+
+class GetPublisherProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=PublisherProfile
+        fields=['id','role_type','description','experience','document','approved_status','reason']

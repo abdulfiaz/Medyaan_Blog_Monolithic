@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from rest_framework import status
 from django.db.models import QuerySet
 from django.conf import settings    
-from users.serializers import CustomUserSerializer, UserPersonalProfileSerializer,GetCustomUserSerializer,PublisherProfileSerializer
+from users.serializers import CustomUserSerializer, UserPersonalProfileSerializer,GetCustomUserSerializer,PublisherProfileSerializer,GetPublisherProfileSerializer
 from adminapp.iudetail import get_iuobj
 from users.auth import get_user_roles
 from rest_framework.exceptions import AuthenticationFailed
@@ -74,7 +74,7 @@ class RoleMasterCreateView(APIView):
             iu_id = get_iuobj(domain)
     
             if not iu_id:
-                return Response({'status': 'failure', 'message': 'IU domain not found.'},status=status.HTTP_404_NOT_FOUND)
+                return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
 
             role = RoleMaster(
                 name=role_name_input,
@@ -103,7 +103,7 @@ class CreateCustomUserView(APIView):
         iu_master = get_iuobj(domain)
 
         if not iu_master:
-            return Response({'status': 'failure', 'message': 'IU domain not found.'},status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
 
         if user_role in ['manager','admin'] and role_name is not None:
             if role_name == 'manager' and user_role != 'admin':
@@ -113,7 +113,7 @@ class CreateCustomUserView(APIView):
         else:
             users = CustomUser.objects.filter(id=user.id,iu_id = iu_master,is_active=True)
         user_data = GetCustomUserSerializer(users, many=True)
-        return Response({"users": user_data.data}, status=status.HTTP_200_OK)
+        return Response({"status":"success","message":"data retrieved successfully","data": user_data.data}, status=status.HTTP_200_OK)
         
     def post(self, request):
         role_name = request.data.get('role_type', 'consumer')
@@ -124,7 +124,7 @@ class CreateCustomUserView(APIView):
         iu_master = get_iuobj(domain)
 
         if not iu_master:
-            return Response({'status': 'failure', 'message': 'IU domain not found.'},status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
         
         if user_role is None:
             role_name = 'consumer'
@@ -192,12 +192,12 @@ class CreateCustomUserView(APIView):
         
 
         user_profile_serializer = UserPersonalProfileSerializer(data=data_user)
-        try:
-            if user_profile_serializer.is_valid():
-                user_profile_serializer.save()
-                transaction.commit()
-                return Response({"status":"success","message": "User created successfully!"}, status=status.HTTP_201_CREATED)
-        except:
+        
+        if user_profile_serializer.is_valid():
+            user_profile_serializer.save()
+            transaction.commit()
+            return Response({"status":"success","message": "User created successfully!"}, status=status.HTTP_201_CREATED)
+        else:
             transaction.rollback()
             return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
              
@@ -208,7 +208,7 @@ class CreateCustomUserView(APIView):
         iu_master = get_iuobj(domain)
 
         if not iu_master:
-            return Response({'status': 'error', 'message': 'IU domain not found.'},status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'error', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
 
         try:
             user = CustomUser.objects.get(id=request.user.id,iu_id=iu_master,is_active=True)
@@ -228,22 +228,22 @@ class CreateCustomUserView(APIView):
 
         try:
             user_profile = UserPersonalProfile.objects.get(user=user,iu_id=iu_master)
-            data =request.data
-            data['modified_by']=request.user.id
-            user_profile_serializer = UserPersonalProfileSerializer(user_profile, data=data, partial=True)
-            
-            try:
-                if user_profile_serializer.is_valid():
-                    user_profile_serializer.save()
-                    transaction.commit()
-                    return Response({"status":"sucess","message": "User updated successfully!"}, status=status.HTTP_200_OK)
-                
-            except:
-                transaction.rollback()
-                return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except UserPersonalProfile.DoesNotExist:
             return Response({"status":"error","message": "User personal profile not found."}, status=status.HTTP_404_NOT_FOUND)
    
+        data =request.data
+        data['modified_by']=request.user.id
+        user_profile_serializer = UserPersonalProfileSerializer(user_profile, data=data, partial=True)
+
+        if user_profile_serializer.is_valid():
+            user_profile_serializer.save()
+            transaction.commit()
+            return Response({"status":"sucess","message": "User updated successfully!"}, status=status.HTTP_200_OK)
+        
+        else:
+            transaction.rollback()
+            return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
     def delete(self, request):
         user_id = request.data.get('user_id',None)
         user_role = get_user_roles(request)
@@ -280,3 +280,79 @@ class CreateCustomUserView(APIView):
 class PublisherProfileView(APIView):
     def get(self,request):
         return
+    
+
+# manager approval for publisher and eventorganiser
+class ManagerApprovalView(APIView):
+    def get(self,request):
+        role_type = request.query_params.get('role_type')
+        approved_status = request.query_params.get('approved_status')
+        user_role = get_user_roles(request)
+        
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+
+        iu_master = get_iuobj(domain)
+
+        if user_role != 'manager':
+            return Response({"status":"error","message":"You are unaithorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+
+        if not iu_master:
+            return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
+        
+        # to count the total of aproved_status'pending,approved,rejected' and total of all publisher,eventorganiser
+        counts={}
+        if approved_status is None:
+            users = PublisherProfile.objects.filter(role_type=role_type,iu_id = iu_master,is_active=True)
+        elif approved_status == 'pending':
+            users = PublisherProfile.objects.filter(role_type=role_type,approved_status='pending',iu_id=iu_master,is_rejected=False)
+        elif approved_status == 'approved':
+            users = PublisherProfile.objects.filter(role_type=role_type,approved_status='approved',iu_id=iu_master,is_rejected=False)
+        elif approved_status == 'rejected':
+            users = PublisherProfile.objects.filter(role_type=role_type,approved_status='rejected',iu_id=iu_master,is_rejected=True)
+        
+        all_data= PublisherProfile.objects.filter(role_type=role_type, iu_id=iu_master, is_active=True)
+        counts['total_' + role_type] = all_data.count()
+        counts['approved_status_pending'] = all_data.filter( approved_status='pending',is_rejected=False).count()
+        counts['approved_status_approved'] = all_data.filter(approved_status='approved', is_rejected=False).count()
+        counts['approved_status_rejected'] = all_data.filter(approved_status='rejected', is_rejected=True).count()
+    
+
+        user_data = GetPublisherProfileSerializer(users, many=True)
+        return Response({"status":"success","message":"data retrieved successfully","data": user_data.data,"counts": counts}, status=status.HTTP_200_OK)
+
+    def put(self,request):
+        user_id = request.data.get('user_id')
+        user_role = get_user_roles(request)
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        iu_master = get_iuobj(domain)
+        if not iu_master:
+            return Response({'status': 'error', 'message': 'Unauthorized domain'},status=status.HTTP_401_UNAUTHORIZED)
+        
+        if user_role != 'manager':
+            return Response({"status":"error","message":"You are unaithorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+        if not user_id:
+            return Response({"status":"error","message":"user_id is required"},status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = PublisherProfile.objects.get(id=user_id,approved_status='pending',is_active=True,iu_id=iu_master)
+        except PublisherProfile.DoesNotExist:
+            return Response({"status":"error","message":"user not found!"},status=status.HTTP_404_NOT_FOUND)
+        
+        transaction.set_autocommit(False)
+        data=request.data
+        data['modified_by']=request.user.id
+        data['is_rejected']=True
+
+        serializer=PublisherProfileSerializer(user,data=data,partial=True)
+
+        if not serializer.is_valid():
+            transaction.rollback()
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer.save()
+        transaction.commit()
+        return Response({"status":"success","message":"User details updated successfully"})
+    
+
+     
