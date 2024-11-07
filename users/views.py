@@ -47,8 +47,33 @@ def login(request):
             traceback.print_exc()
             transaction.rollback()
             return Response({'status': 'error', 'message': 'Something went wrong...' + str(e)},status=status.HTTP_400_BAD_REQUEST)
- 
+@api_view(['Post'])
+def switch_role(request):
+    if request.method == 'POST':
+        try:
+            transaction.set_autocommit(False)
+            user=request.user
+            role_id=request.data.get('role_id')
+            role=RoleMaster.objects.get(id=role_id,is_active=True)
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            if not iu_master:
+                return Response({'status': 'error', 'message': 'UNAUTHORIZED DOMAIN.'},status=status.HTTP_404_NOT_FOUND)
+            try:
+                user_role=RoleMapping.objects.get(user=user,role=role,iu_id=iu_master)
+            except RoleMapping.DoesNotExist:
+                transaction.rollback()
+                return Response({"status":"error","message":f"You are not approved for role {role.name}"},status=status.HTTP_400_BAD_REQUEST)
 
+            user.last_login_role=role.name
+            user.save()
+            payload = jwt_payload_handler(user)
+            token = jwt_encode_handler(payload)
+            transaction.commit()
+            return Response({"status":"success","message":token},status=status.HTTP_200_OK)
+        except Exception as e:
+            transaction.rollback()
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
 
 class RoleMasterCreateView(APIView):
     def post(self, request):
@@ -74,7 +99,7 @@ class RoleMasterCreateView(APIView):
             iu_id = get_iuobj(domain)
     
             if not iu_id:
-                return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
+                return Response({'status': 'failure', 'message': 'IU domain not found.'},status=status.HTTP_404_NOT_FOUND)
 
             role = RoleMaster(
                 name=role_name_input,
@@ -103,7 +128,7 @@ class CreateCustomUserView(APIView):
         iu_master = get_iuobj(domain)
 
         if not iu_master:
-            return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'failure', 'message': 'IU domain not found.'},status=status.HTTP_404_NOT_FOUND)
 
         if user_role in ['manager','admin'] and role_name is not None:
             if role_name == 'manager' and user_role != 'admin':
@@ -113,7 +138,7 @@ class CreateCustomUserView(APIView):
         else:
             users = CustomUser.objects.filter(id=user.id,iu_id = iu_master,is_active=True)
         user_data = GetCustomUserSerializer(users, many=True)
-        return Response({"status":"success","message":"data retrieved successfully","data": user_data.data}, status=status.HTTP_200_OK)
+        return Response({"users": user_data.data}, status=status.HTTP_200_OK)
         
     def post(self, request):
         role_name = request.data.get('role_type', 'consumer')
@@ -124,7 +149,7 @@ class CreateCustomUserView(APIView):
         iu_master = get_iuobj(domain)
 
         if not iu_master:
-            return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'failure', 'message': 'UNAUTHORIZED DOMAIN.'},status=status.HTTP_404_NOT_FOUND)
         
         if user_role is None:
             role_name = 'consumer'
@@ -192,58 +217,66 @@ class CreateCustomUserView(APIView):
         
 
         user_profile_serializer = UserPersonalProfileSerializer(data=data_user)
-        
-        if user_profile_serializer.is_valid():
-            user_profile_serializer.save()
-            transaction.commit()
-            return Response({"status":"success","message": "User created successfully!"}, status=status.HTTP_201_CREATED)
-        else:
+        try:
+            if user_profile_serializer.is_valid():
+                user_profile_serializer.save()
+                transaction.commit()
+                return Response({"status":"success","message": "User created successfully!"}, status=status.HTTP_201_CREATED)
+        except:
             transaction.rollback()
             return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
              
     def put(self, request):
-
+        
+        data = request.data
+        data['modified_by']=request.user.id
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
 
         iu_master = get_iuobj(domain)
 
         if not iu_master:
-            return Response({'status': 'error', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
-
+            return Response({'status': 'error', 'message': 'UNAUTHORIZED DOMAIN.'},status=status.HTTP_404_NOT_FOUND)
+        
+        user_role = get_user_roles(request)
+        
         try:
             user = CustomUser.objects.get(id=request.user.id,iu_id=iu_master,is_active=True)
         except CustomUser.DoesNotExist:
             return Response({"status":"success","message": "User not found."}, status=status.HTTP_404_NOT_FOUND)
         
         transaction.set_autocommit(False)
-        data =request.data
-        data['modified_by']=request.user.id
 
         user_serializer = CustomUserSerializer(user, data=data, partial=True)
 
-        if user_serializer.is_valid():
-            user_serializer.save()
-        else:
+        if not user_serializer.is_valid():
             return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        user_serializer.save()     
         try:
             user_profile = UserPersonalProfile.objects.get(user=user,iu_id=iu_master)
+            
+            user_profile_serializer = UserPersonalProfileSerializer(user_profile, data=data, partial=True)
+            if not user_profile_serializer.is_valid():
+                transaction.rollback()
+                return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            user_profile_serializer.save()
+            if user_role in ['publisher','eventorganiser']:
+                publisher_detail=PublisherProfile.objects.get(user=request.user,role_type=user_role,iu_id=iu_master,approved_status='approved',is_active=True)
+                data['approved_status']='pending'
+                serializer=PublisherProfileSerializer(publisher_detail,data=data,partial=True)
+                if not serializer.is_valid():
+                    return Response({"status":"error","message":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
+                serializer.save()
+            
+            transaction.commit()
+            return Response({"status":"sucess","message": "User updated successfully!"},status=status.HTTP_200_OK)
+        except PublisherProfile.DoesNotExist:
+            transaction.rollback()
+            return Response({"status":"error","message":f"{user_role} does not found"},status=status.HTTP_400_BAD_REQUEST)
         except UserPersonalProfile.DoesNotExist:
             return Response({"status":"error","message": "User personal profile not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
    
-        data =request.data
-        data['modified_by']=request.user.id
-        user_profile_serializer = UserPersonalProfileSerializer(user_profile, data=data, partial=True)
-
-        if user_profile_serializer.is_valid():
-            user_profile_serializer.save()
-            transaction.commit()
-            return Response({"status":"sucess","message": "User updated successfully!"}, status=status.HTTP_200_OK)
-        
-        else:
-            transaction.rollback()
-            return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
     def delete(self, request):
         user_id = request.data.get('user_id',None)
         user_role = get_user_roles(request)
@@ -277,10 +310,6 @@ class CreateCustomUserView(APIView):
         else:
             return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class PublisherProfileView(APIView):
-    def get(self,request):
-        return
-    
 
 # manager approval for publisher and eventorganiser
 class ManagerApprovalView(APIView):

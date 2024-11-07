@@ -18,17 +18,10 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
         return data
     
-
-
-
 class UserPersonalProfileSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = UserPersonalProfile
         fields = '__all__'
-
-
-
 
 class GetCustomUserSerializer(serializers.ModelSerializer):
     firstname = serializers.CharField(source='userdetails.first.firstname', default=None)
