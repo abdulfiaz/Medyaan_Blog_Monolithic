@@ -38,7 +38,7 @@ class Comments(BaseModel):
     post=models.ForeignKey(PostDetails,on_delete=models.CASCADE,related_name='comments_post_id')
     user=models.ForeignKey(CustomUser,on_delete=models.CASCADE,related_name='comments_user_id')
     sub_comment=models.BooleanField(default=False)
-    list_tag_user=ArrayField(models.IntegerField(blank=True,null=True))
+    list_tag_user=ArrayField(models.IntegerField(),blank=True,null=True)
     message=models.TextField(blank=True,null=True)
     is_removed_comment=models.BooleanField(default=False)
     timestamp=models.IntegerField()
