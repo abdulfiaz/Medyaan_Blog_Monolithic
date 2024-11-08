@@ -2,8 +2,8 @@ from django.shortcuts import render
 from rest_framework.views import APIView,status
 from rest_framework.response import Response
 from posts.serializers import PostCategorySerializer,GetPostCategorySerializer,PostDetailsSerializer,GetPostDetailsSerializer
-from posts.models import PostCategory,PostDetails
-from users.models import PublisherProfile
+from posts.models import *
+from users.models import *
 from users.auth import get_user_roles
 from django.conf import settings
 from adminapp.iudetail import get_iuobj    
@@ -123,8 +123,27 @@ class PostCategoryView(APIView):
 
 class PostDetailsView(APIView):
     def get(self,request):
-        pass
+        try:
+            category_id=request.query_params.get('category_id',None)
+            publisher_user_id=request.query_params.get('user_id',None)
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            if not iu_master :
+                return Response({"status":"error","message":"UNAUTHORIZED DOMAIN"},status=status.HTTP_404_NOT_FOUND)
+            if publisher_user_id:
+                publisher_detail=CustomUser.objects.get(id=publisher_user_id,is_active=True,iu_id=iu_master)
+                publish_user=PublisherProfile.objects.get(user=publisher_detail,is_active=True,iu_id=iu_master,approved_status='approved',role_type='publisher')
+                post=PostDetails.objects.filter(publisher=publish_user.user,iu_id=iu_master,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
+            elif category_id:
+                post=PostDetails.objects.filter(category_id=category_id,iu_id=iu_master,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
+            else:
+                post=PostDetails.objects.filter(iu_id=iu_master,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
 
+            serializer=GetPostDetailsSerializer(post,many=True)
+            return Response({"status":"success","message":"Post Details","data":serializer.data},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+        
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         iu_master = get_iuobj(domain)
