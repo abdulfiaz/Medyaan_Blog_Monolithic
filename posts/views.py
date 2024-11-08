@@ -136,7 +136,7 @@ class PostDetailsView(APIView):
         if user_role != 'publisher':
             return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
         
-        publisher_status = PublisherProfile.objects.get(id=request.user.id,is_active=True)
+        publisher_status = PublisherProfile.objects.get(user=request.user,is_active=True,role_type='publisher',is_rejected=False)
         if publisher_status.approved_status == 'pending':
             return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
         
@@ -168,13 +168,13 @@ class PostDetailsView(APIView):
             return Response({"status":"error","message":"post_id is required"},status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            post_obj=PostDetails.objects.get(id=post_id,publisher=request.user.id,status='published',is_active=True,iu_id=iu_master)
+            post_obj=PostDetails.objects.get(id=post_id,publisher=request.user.id,post_status='published',is_active=True,iu_id=iu_master)
         except PostDetails.DoesNotExist:
             return Response({"status":"error","message":"Post not found!"},status=status.HTTP_404_NOT_FOUND)
         
         data =request.data
         data['modified_by']=request.user.id
-        data['status']='pending'
+        data['post_status']='pending'
 
         serializer = PostDetailsSerializer(post_obj,data=data,partial=True)
 
@@ -197,9 +197,9 @@ class PostDetailsView(APIView):
             user_role = get_user_roles(request)
             try:
                 if user_role == 'manager':
-                    post_obj = PostDetails.objects.get(id=post_id,status='published',is_active=True,iu_id=iu_master)
+                    post_obj = PostDetails.objects.get(id=post_id,post_status='published',is_active=True,iu_id=iu_master)
                 elif user_role == 'publisher':
-                    post_obj = PostDetails.objects.get(id=post_id,status='published',is_active=True,publisher=request.user.id,iu_id=iu_master)
+                    post_obj = PostDetails.objects.get(id=post_id,post_status='published',is_active=True,publisher=request.user.id,iu_id=iu_master)
             except PostDetails.DoesNotExist:
                 return Response({"status":"error","message":"post not found"},status=status.HTTP_404_NOT_FOUND)
             
@@ -230,17 +230,17 @@ class PostApprovalView(APIView):
         # to count the total of aproved_status'pending,approved,rejected' and total of all publisher,eventorganiser
         counts={}
         if approved_status == 'pending':
-            users = PostDetails.objects.filter(status='pending',iu_id=iu_master,is_active=True)
+            users = PostDetails.objects.filter(post_status='pending',iu_id=iu_master,is_active=True)
         elif approved_status == 'published':
-            users = PostDetails.objects.filter(status='published',iu_id=iu_master,is_active=True)
+            users = PostDetails.objects.filter(post_status='published',iu_id=iu_master,is_active=True)
         elif approved_status == 'rejected':
-            users = PostDetails.objects.filter(status='rejected',iu_id=iu_master,is_active=True)
+            users = PostDetails.objects.filter(post_status='rejected',iu_id=iu_master,is_active=True)
         
         all_data= PostDetails.objects.filter(iu_id=iu_master, is_active=True)
         counts['total_posts'] = all_data.count()
-        counts['status_pending'] = all_data.filter(status='pending').count()
-        counts['status_published'] = all_data.filter(status='published').count()
-        counts['status_rejected'] = all_data.filter(status='rejected').count()
+        counts['status_pending'] = all_data.filter(post_status='pending').count()
+        counts['status_published'] = all_data.filter(post_status='published').count()
+        counts['status_rejected'] = all_data.filter(post_status='rejected').count()
     
 
         user_data = GetPostDetailsSerializer(users, many=True)
@@ -259,7 +259,7 @@ class PostApprovalView(APIView):
             return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
         
         try:
-            post_obj=PostDetails.objects.get(id=post_id,status='pending',is_active=True,iu_id=iu_master)
+            post_obj=PostDetails.objects.get(id=post_id,post_status='pending',is_active=True,iu_id=iu_master)
         except PostDetails.DoesNotExist:
             return Response({"status":"error","message":"Post not found"},status=status.HTTP_404_NOT_FOUND)
         

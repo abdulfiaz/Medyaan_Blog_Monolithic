@@ -24,7 +24,7 @@ class PostDetails(BaseModel):
     category=models.ForeignKey(PostCategory,on_delete=models.CASCADE,blank=True,null=True,related_name='post_category')
     title=models.TextField(blank=True,null=True)
     content=models.TextField(blank=True,null=True)
-    status=models.CharField(default='pending',max_length=50)
+    post_status=models.CharField(default='pending',max_length=50)
     image=ArrayField(JSONField(),default=list,blank=True)
     is_archived=models.BooleanField(default=False)
     iu_id=models.ForeignKey(IUMaster,related_name='postdetails_iu',on_delete = models.CASCADE)

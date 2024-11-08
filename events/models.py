@@ -13,6 +13,7 @@ class EventDetails(BaseModel):
     longitude = models.CharField(max_length=20, null=True, blank=True)
     latitude = models.CharField(max_length=20, null=True, blank=True)
     address = models.TextField()
+    event_status = models.CharField(default='pending',max_length=50)
     iu_id=models.ForeignKey(IUMaster,related_name='eventdetails_iu',on_delete = models.CASCADE)
 
     class Meta:
