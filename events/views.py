@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework.views import APIView,status
 from rest_framework.response import Response
-from events.serializers import EventDetailsSerializer
+from events.serializers import EventDetailsSerializer,GetEventDetailsSerializer
 from events.models import EventDetails
 from users.models import PublisherProfile
 from users.auth import get_user_roles
@@ -25,7 +25,7 @@ class EventDetailsView(APIView):
             return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
         
         eventorganizer_status = PublisherProfile.objects.get(user=request.user,is_active=True,role_type='eventorganiser',is_rejected=False,iu_id=iu_master)
-        if eventorganizer_status.approved_status != 'approved':
+        if eventorganizer_status.approved_status != 'published':
             return Response({"status":"error","message":"Your approval is still pending!"},status=status.HTTP_401_UNAUTHORIZED)
         
         transaction.set_autocommit(False)
@@ -56,10 +56,11 @@ class EventDetailsView(APIView):
             return Response({"status":"error","message":"event_id is required"},status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            event_obj = EventDetails.objects.get(id=event_id,event_organizer=request.user,event_status='approved',is_active=True,iu_id=iu_master)
+            event_obj = EventDetails.objects.get(id=event_id,event_organizer=request.user,event_status='published',is_active=True,iu_id=iu_master)
         except EventDetails.DoesNotExist:
             return Response({"status":"error","message":"Event not found"},status=status.HTTP_404_NOT_FOUND)
         
+        transaction.set_autocommit(False)
         data =request.data
         data['modified_by']=request.user.id
         data['event_status']='pending'
@@ -73,3 +74,94 @@ class EventDetailsView(APIView):
         serializer.save()
         transaction.commit()
         return Response({"status":"success","message":"event updated successfully!"},status=status.HTTP_201_CREATED)
+    
+    def delete(self,request):
+        try:
+            event_id = request.data.get('event_id')
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            if not iu_master :
+                return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)        
+
+            user_role = get_user_roles(request)
+            try:
+                if user_role == 'manager':
+                    event_obj = EventDetails.objects.get(id=event_id,event_status='published',is_active=True,iu_id=iu_master)
+                elif user_role == 'eventorganiser':
+                    event_obj = EventDetails.objects.get(id=event_id,event_status='published',is_active=True,event_organizer=request.user.id,iu_id=iu_master)
+            except EventDetails.DoesNotExist:
+                return Response({"status":"error","message":"event not found"},status=status.HTTP_404_NOT_FOUND)
+            
+            event_obj.is_active=False
+            event_obj.is_archived=True
+            event_obj.modified_by=request.user.id
+            event_obj.save()
+
+            return Response({"status":"success","message":"event deleted successfully !"},status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_403_FORBIDDEN)
+        
+class EventApproval(APIView):
+    def get(self,request):
+        approved_status = request.query_params.get('status','pending')
+        user_role = get_user_roles(request)
+        
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        iu_master = get_iuobj(domain)
+        if not iu_master:
+            return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
+
+        if user_role != 'manager':
+            return Response({"status":"error","message":"You are unaithorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+        # to count the total of aproved_status'pending,approved,rejected' and total of all publisher,eventorganiser
+        counts = {}
+        
+        all_data = EventDetails.objects.filter(iu_id=iu_master, is_active=True)
+        events = all_data.filter(event_status=approved_status)
+
+        counts['total_posts'] = all_data.count()
+        approved_statuses = ['pending', 'published', 'rejected']
+        for event_status in approved_statuses:
+            counts[f'status_{event_status}'] = all_data.filter(event_status=event_status).count()
+
+        event_data = GetEventDetailsSerializer(events, many=True)
+        return Response({"status":"success","message":"data retrieved successfully","data": event_data.data,"counts": counts},status=status.HTTP_200_OK)
+
+    def put(self,request):
+        event_id=request.data.get("event_id")
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        iu_master = get_iuobj(domain)
+        if not iu_master :
+            return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)        
+
+        user_role = get_user_roles(request)
+
+        if user_role!= 'manager':
+            return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+        try:
+            event_obj = EventDetails.objects.get(id=event_id,event_status='pending',is_active=True,iu_id=iu_master)
+        except EventDetails.DoesNotExist:
+            return Response({"status":"error","message":"Event not found"},status=status.HTTP_404_NOT_FOUND)
+        
+        transaction.set_autocommit(False)
+        data=request.data
+        data['modified_by']=request.user.id
+        data['iu_id']=iu_master.id
+
+        serializer = EventDetailsSerializer(event_obj,data=data,partial=True)
+
+        if not serializer.is_valid():
+            transaction.rollback()
+            return Response({"status":"error","message":serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer.save()
+        transaction.commit()
+        return Response({"status":"success","message":"Event details updated successfully"})
+
+
+        
+
+

@@ -3,6 +3,8 @@ from adminapp.models import BaseModel,IUMaster
 from users.models import CustomUser
 
 class EventDetails(BaseModel):
+    name = models.CharField(max_length=20)
+    description = models.CharField(max_length = 100,null=True,blank=True)
     event_organizer = models.ForeignKey(CustomUser,on_delete=models.CASCADE,related_name='event_organizer_id')
     event_date = models.DateTimeField()
     event_amount = models.DecimalField(max_digits=10, decimal_places=2,default=0)

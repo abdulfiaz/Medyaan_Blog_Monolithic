@@ -219,7 +219,6 @@ class PostApprovalView(APIView):
         user_role = get_user_roles(request)
         
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-
         iu_master = get_iuobj(domain)
         if not iu_master:
             return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)

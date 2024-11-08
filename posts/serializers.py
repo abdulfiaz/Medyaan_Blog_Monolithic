@@ -22,10 +22,11 @@ class GetPostDetailsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PostDetails
-        fields = ['id', 'publisher', 'category', 'title', 'content', 'image', 'status', 'user_profile']
+        fields = ['id', 'publisher', 'category', 'title', 'content', 'image', 'post_status', 'user_profile']
 
     def get_user_profile(self, obj):
         profile = obj.publisher.userdetails.first()
+
         if profile:
-            return {'id': profile.id,'firstname': profile.firstname,'lastname': profile.lastname}
+            return {'id': profile.id,'firstname': profile.firstname,'lastname': profile.lastname,'mobile_number':profile.user.mobile_number,'email':profile.user.email}
         return None
