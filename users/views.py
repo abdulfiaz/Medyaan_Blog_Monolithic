@@ -333,11 +333,11 @@ class ManagerApprovalView(APIView):
         if approved_status is None:
             users = PublisherProfile.objects.filter(role_type=role_type,iu_id = iu_master,is_active=True)
         elif approved_status == 'pending':
-            users = PublisherProfile.objects.filter(role_type=role_type,approved_status='pending',iu_id=iu_master,is_rejected=False)
+            users = PublisherProfile.objects.filter(role_type=role_type,approved_status='pending',iu_id=iu_master,is_rejected=False,is_active=True)
         elif approved_status == 'approved':
-            users = PublisherProfile.objects.filter(role_type=role_type,approved_status='approved',iu_id=iu_master,is_rejected=False)
+            users = PublisherProfile.objects.filter(role_type=role_type,approved_status='approved',iu_id=iu_master,is_rejected=False,is_active=True)
         elif approved_status == 'rejected':
-            users = PublisherProfile.objects.filter(role_type=role_type,approved_status='rejected',iu_id=iu_master,is_rejected=True)
+            users = PublisherProfile.objects.filter(role_type=role_type,approved_status='rejected',iu_id=iu_master,is_rejected=True,is_active=True)
         
         all_data= PublisherProfile.objects.filter(role_type=role_type, iu_id=iu_master, is_active=True)
         counts['total_' + role_type] = all_data.count()
@@ -351,7 +351,9 @@ class ManagerApprovalView(APIView):
 
     def put(self,request):
         user_id = request.data.get('user_id')
+        
         user_role = get_user_roles(request)
+        
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         iu_master = get_iuobj(domain)
         if not iu_master:
@@ -371,7 +373,8 @@ class ManagerApprovalView(APIView):
         transaction.set_autocommit(False)
         data=request.data
         data['modified_by']=request.user.id
-        data['is_rejected']=True
+        if data['approved_status']== 'rejected':
+            data['is_rejected']=True
 
         serializer=PublisherProfileSerializer(user,data=data,partial=True)
 

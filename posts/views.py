@@ -1,12 +1,14 @@
 from django.shortcuts import render
 from rest_framework.views import APIView,status
 from rest_framework.response import Response
-from posts.serializers import PostCategorySerializer,GetPostCategorySerializer
-from posts.models import PostCategory
+from posts.serializers import PostCategorySerializer,GetPostCategorySerializer,PostDetailsSerializer,GetPostDetailsSerializer
+from posts.models import PostCategory,PostDetails
+from users.models import PublisherProfile
 from users.auth import get_user_roles
 from django.conf import settings
 from adminapp.iudetail import get_iuobj    
 from django.db import transaction
+
 
 # category view for posts i.e sports,education...
 class PostCategoryView(APIView):
@@ -29,7 +31,6 @@ class PostCategoryView(APIView):
 
         return Response({"status":"success","message":"Category retrievd successfully!","data":serializer.data},status=status.HTTP_200_OK)
 
-
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         iu_master = get_iuobj(domain)
@@ -50,7 +51,7 @@ class PostCategoryView(APIView):
 
         if not serializer.is_valid():
             transaction.rollback()
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"status":"error","message":serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         
         serializer.save()
         transaction.commit()
@@ -84,7 +85,7 @@ class PostCategoryView(APIView):
 
         if not serializer.is_valid():
             transaction.rollback()
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"status":"error","message":serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         
         serializer.save()
         transaction.commit()
@@ -120,6 +121,161 @@ class PostCategoryView(APIView):
         except Exception as e:
             return Response({"status":"error","message":str(e)},status=status.HTTP_403_FORBIDDEN)
 
+class PostDetailsView(APIView):
+    def get(self,request):
+        pass
+
+    def post(self,request):
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        iu_master = get_iuobj(domain)
+        if not iu_master :
+            return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)        
+
+        user_role = get_user_roles(request)
+
+        if user_role != 'publisher':
+            return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
         
+        publisher_status = PublisherProfile.objects.get(id=request.user.id,is_active=True)
+        if publisher_status.approved_status == 'pending':
+            return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+        transaction.set_autocommit(False)
+        data=request.data
+        data['created_by']=request.user.id
+        data['publisher']=request.user.id
+        data['iu_id']=iu_master.id
+        
+        serializer = PostDetailsSerializer(data=data)
+
+        if not serializer.is_valid():
+            transaction.rollback()
+            return Response({"status":"error","message":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer.save()
+        transaction.commit()
+        return Response({"status":"success","message":"Post created successfully!",'data':serializer.data},status=status.HTTP_201_CREATED)
+    
+    def put(self,request):
+        post_id = request.data.get('post_id')
+
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        iu_master = get_iuobj(domain)
+        if not iu_master :
+            return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
+        
+        if not post_id:
+            return Response({"status":"error","message":"post_id is required"},status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            post_obj=PostDetails.objects.get(id=post_id,publisher=request.user.id,status='published',is_active=True,iu_id=iu_master)
+        except PostDetails.DoesNotExist:
+            return Response({"status":"error","message":"Post not found!"},status=status.HTTP_404_NOT_FOUND)
+        
+        data =request.data
+        data['modified_by']=request.user.id
+        data['status']='pending'
+
+        serializer = PostDetailsSerializer(post_obj,data=data,partial=True)
+
+        if not serializer.is_valid():
+            transaction.rollback()
+            return Response({"status":"error","message":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer.save()
+        transaction.commit()
+        return Response({"status":"success","message":"Post updated successfully!"},status=status.HTTP_201_CREATED)
+        
+    def delete(self,request):
+        try:
+            post_id = request.data.get('post_id')
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            if not iu_master :
+                return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)        
+
+            user_role = get_user_roles(request)
+            try:
+                if user_role == 'manager':
+                    post_obj = PostDetails.objects.get(id=post_id,status='published',is_active=True,iu_id=iu_master)
+                elif user_role == 'publisher':
+                    post_obj = PostDetails.objects.get(id=post_id,status='published',is_active=True,publisher=request.user.id,iu_id=iu_master)
+            except PostDetails.DoesNotExist:
+                return Response({"status":"error","message":"post not found"},status=status.HTTP_404_NOT_FOUND)
+            
+            post_obj.is_active=False
+            post_obj.is_archived=True
+            post_obj.modified_by=request.user.id
+            post_obj.save()
+
+            return Response({"status":"success","message":"post deleted successfully !"},status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_403_FORBIDDEN)
+
+class PostApprovalView(APIView):
+    def get(self,request):
+        approved_status = request.query_params.get('status','pending')
+        user_role = get_user_roles(request)
+        
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+
+        iu_master = get_iuobj(domain)
+        if not iu_master:
+            return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
+
+        if user_role != 'manager':
+            return Response({"status":"error","message":"You are unaithorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+        # to count the total of aproved_status'pending,approved,rejected' and total of all publisher,eventorganiser
+        counts={}
+        if approved_status == 'pending':
+            users = PostDetails.objects.filter(status='pending',iu_id=iu_master,is_active=True)
+        elif approved_status == 'published':
+            users = PostDetails.objects.filter(status='published',iu_id=iu_master,is_active=True)
+        elif approved_status == 'rejected':
+            users = PostDetails.objects.filter(status='rejected',iu_id=iu_master,is_active=True)
+        
+        all_data= PostDetails.objects.filter(iu_id=iu_master, is_active=True)
+        counts['total_posts'] = all_data.count()
+        counts['status_pending'] = all_data.filter(status='pending').count()
+        counts['status_published'] = all_data.filter(status='published').count()
+        counts['status_rejected'] = all_data.filter(status='rejected').count()
+    
+
+        user_data = GetPostDetailsSerializer(users, many=True)
+        return Response({"status":"success","message":"data retrieved successfully","data": user_data.data,"counts": counts}, status=status.HTTP_200_OK)
+
+    def put(self,request):
+        post_id = request.data.get("post_id")
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        iu_master = get_iuobj(domain)
+        if not iu_master :
+            return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
+        
+        user_role = get_user_roles(request)
+
+        if user_role != 'manager':
+            return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+        try:
+            post_obj=PostDetails.objects.get(id=post_id,status='pending',is_active=True,iu_id=iu_master)
+        except PostDetails.DoesNotExist:
+            return Response({"status":"error","message":"Post not found"},status=status.HTTP_404_NOT_FOUND)
+        
+        transaction.set_autocommit(False)
+        data=request.data
+        data['modified_by']=request.user.id
+
+        serializer = PostDetailsSerializer(post_obj,data=data,partial=True)
+
+        if not serializer.is_valid():
+            transaction.rollback()
+            return Response({"status":"error","message":serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer.save()
+        transaction.commit()
+        return Response({"status":"success","message":"User details updated successfully"})
+
 
 

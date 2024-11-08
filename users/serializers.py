@@ -23,6 +23,7 @@ class UserPersonalProfileSerializer(serializers.ModelSerializer):
         model = UserPersonalProfile
         fields = '__all__'
 
+
 class GetCustomUserSerializer(serializers.ModelSerializer):
     firstname = serializers.CharField(source='userdetails.first.firstname', default=None)
     lastname = serializers.CharField(source='userdetails.first.lastname', default=None)
