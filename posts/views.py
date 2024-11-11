@@ -246,23 +246,19 @@ class PostApprovalView(APIView):
             return Response({"status":"error","message":"You are unaithorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
         
         # to count the total of aproved_status'pending,approved,rejected' and total of all publisher,eventorganiser
-        counts={}
-        if approved_status == 'pending':
-            users = PostDetails.objects.filter(post_status='pending',iu_id=iu_master,is_active=True)
-        elif approved_status == 'published':
-            users = PostDetails.objects.filter(post_status='published',iu_id=iu_master,is_active=True)
-        elif approved_status == 'rejected':
-            users = PostDetails.objects.filter(post_status='rejected',iu_id=iu_master,is_active=True)
         
-        all_data= PostDetails.objects.filter(iu_id=iu_master, is_active=True)
+        counts = {}
+        all_data = PostDetails.objects.filter(iu_id=iu_master, is_active=True)
+        posts = all_data.filter(post_status=approved_status)
+
         counts['total_posts'] = all_data.count()
-        counts['status_pending'] = all_data.filter(post_status='pending').count()
-        counts['status_published'] = all_data.filter(post_status='published').count()
-        counts['status_rejected'] = all_data.filter(post_status='rejected').count()
+        approved_statuses = ['pending', 'published', 'rejected']
+        for post_status in approved_statuses:
+            counts[f'status_{post_status}'] = all_data.filter(post_status=post_status).count()
     
 
-        user_data = GetPostDetailsSerializer(users, many=True)
-        return Response({"status":"success","message":"data retrieved successfully","data": user_data.data,"counts": counts}, status=status.HTTP_200_OK)
+        posts_data = GetPostDetailsSerializer(posts, many=True)
+        return Response({"status":"success","message":"data retrieved successfully","data": posts_data.data,"counts": counts}, status=status.HTTP_200_OK)
 
     def put(self,request):
         post_id = request.data.get("post_id")
