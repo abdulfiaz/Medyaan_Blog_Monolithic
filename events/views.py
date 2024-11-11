@@ -1,4 +1,6 @@
 from django.shortcuts import render
+from datetime import datetime
+from django.utils import timezone
 from rest_framework.views import APIView,status
 from rest_framework.response import Response
 from events.serializers import EventDetailsSerializer,GetEventDetailsSerializer
@@ -10,8 +12,29 @@ from adminapp.iudetail import get_iuobj
 from django.db import transaction
 
 class EventDetailsView(APIView):
-    def get(self,requset):
-        pass
+    def get(self,request):
+        event_date = request.query_params.get('date')
+        event_organizer = request.query_params.get('event_organizer')
+
+        if event_date:
+            try:
+                date_obj = datetime.strptime(event_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({"status": "error", "message": "Invalid date format. Use YYYY-MM-DD."},status=status.HTTP_400_BAD_REQUEST)
+
+            events = EventDetails.objects.filter(event_date__date=date_obj,is_active=True).order_by('-created_at')
+        elif event_organizer:
+            events = EventDetails.objects.filter(event_organizer=event_organizer,is_active=True).order_by('-created_at')
+        else:
+            events = EventDetails.objects.filter(event_date__gt=timezone.now(),is_active=True).order_by('-created_at')
+
+        event_list = []
+        for event in events:
+            event_data = GetEventDetailsSerializer(event).data
+            event_data['event_detailed_status'] = 'upcoming' if event.event_date > timezone.now() else 'completed'
+            event_list.append(event_data)
+
+        return Response({"status": "success", "message": "Events retrieved successfully", "data": event_list},status=status.HTTP_200_OK)
 
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
@@ -25,7 +48,7 @@ class EventDetailsView(APIView):
             return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
         
         eventorganizer_status = PublisherProfile.objects.get(user=request.user,is_active=True,role_type='eventorganiser',is_rejected=False,iu_id=iu_master)
-        if eventorganizer_status.approved_status != 'published':
+        if eventorganizer_status.approved_status != 'approved':
             return Response({"status":"error","message":"Your approval is still pending!"},status=status.HTTP_401_UNAUTHORIZED)
         
         transaction.set_autocommit(False)
