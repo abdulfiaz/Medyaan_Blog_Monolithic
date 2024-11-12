@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from events.models import EventDetails
+from events.models import EventDetails,EventBookingDetails
 
 class EventDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,3 +18,8 @@ class GetEventDetailsSerializer(serializers.ModelSerializer):
         if profile:
             return {'id': profile.id,'firstname': profile.firstname,'lastname': profile.lastname,'mobile_number':profile.user.mobile_number,'email':profile.user.email}
         return None
+
+class EventBookingDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventBookingDetails
+        fields = '__all__'

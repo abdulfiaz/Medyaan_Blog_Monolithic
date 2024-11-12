@@ -3,7 +3,7 @@ from datetime import datetime
 from django.utils import timezone
 from rest_framework.views import APIView,status
 from rest_framework.response import Response
-from events.serializers import EventDetailsSerializer,GetEventDetailsSerializer
+from events.serializers import EventDetailsSerializer,GetEventDetailsSerializer,EventBookingDetailsSerializer
 from events.models import EventDetails
 from users.models import PublisherProfile
 from users.auth import get_user_roles
@@ -184,6 +184,51 @@ class EventApproval(APIView):
         transaction.commit()
         return Response({"status":"success","message":"Event details updated successfully"})
 
+class EventBookingDetailsView(APIView):
+    def post(self,request):
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        event_id = request.data.get('event')
+        no_of_tickets = request.data.get('no_of_tickets',1)
+        iu_master = get_iuobj(domain)
+        if not iu_master :
+            return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)  
+        
+        if not event_id:
+            return Response({"status":"error","message":"event id is required"},status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            event_obj = EventDetails.objects.get(id=event_id,iu_id=iu_master,is_active=True)
+        except EventDetails.DoesNotExist:
+            return Response({"status":"error","message":"event details not found!"},status=status.HTTP_404_NOT_FOUND)
+        
+        payment_status_obj = 'paid' if event_obj.payment_needed else 'unpaid'
+
+        sub_total = no_of_tickets * event_obj.event_amount
+        vat = (0+event_obj.event_amount)/100
+        total = vat + sub_total
+
+        transaction.set_autocommit(False)
+        data=request.data
+        data['iu_id']=iu_master.id
+        data['user']=request.user.id
+        data['created_by']=request.user.id
+        data['payment_status']=payment_status_obj
+        data['sub_total']=sub_total
+        data['total']=total
+
+        serializer = EventBookingDetailsSerializer(data=data)
+
+        if not serializer.is_valid():
+            transaction.rollback()
+            return Response({"status":"error","message":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
+        
+        event_booking = serializer.save()
+        transaction.commit()
+        return Response({"status":"success","message":"Event booking created successfully","data":{'id':event_booking.id,'booking_date':event_booking.booking_date}},status=status.HTTP_201_CREATED)
+
+
+            
+        
 
         
 
