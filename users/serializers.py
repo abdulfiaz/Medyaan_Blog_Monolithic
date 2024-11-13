@@ -36,7 +36,7 @@ class GetCustomUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['mobile_number', 'email', 'firstname', 'lastname','profilephoto', 'gender', 'age', 'language','primary_address', 'secondary_address']
+        fields = ['id','mobile_number', 'email', 'firstname', 'lastname','profilephoto', 'gender', 'age', 'language','primary_address', 'secondary_address']
 
 class PublisherProfileSerializer(serializers.ModelSerializer):
     class Meta:

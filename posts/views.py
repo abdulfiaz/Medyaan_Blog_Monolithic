@@ -1,13 +1,14 @@
 from django.shortcuts import render
 from rest_framework.views import APIView,status
 from rest_framework.response import Response
-from posts.serializers import PostCategorySerializer,GetPostCategorySerializer,PostDetailsSerializer,GetPostDetailsSerializer
+from posts.serializers import *
 from posts.models import *
 from users.models import *
 from users.auth import get_user_roles
 from django.conf import settings
 from adminapp.iudetail import get_iuobj    
 from django.db import transaction
+from django.utils import timezone
 
 
 # category view for posts i.e sports,education...
@@ -291,5 +292,121 @@ class PostApprovalView(APIView):
         transaction.commit()
         return Response({"status":"success","message":"User details updated successfully"})
 
+class CommentsView(APIView):
+    def get(self,request):
+        try:
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            post_id=request.query_params.get('post_id')
+            parent_comment_id=request.query_params.get('parent_comment_id',None)
+            if parent_comment_id is None:
+                comments_detail=Comments.objects.filter(is_active=True,iu_id=iu_master,post_id=post_id,is_removed_comment=False,parent_comment__isnull=True)
+            else:
+                comments_detail=Comments.objects.filter(is_active=True,iu_id=iu_master,post_id=post_id,is_removed_comment=False,id=parent_comment_id)
+            serializer=CommentsSerializer(comments_detail,many=True,fields=['id','message','list_tag_users','subcomments'])
+            return Response({"status":"success","message":serializer.data},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+
+    def post(self,request):
+        try:
+            data=request.data
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            if not iu_master :
+                return Response({"status":"error","message":"UNAUTHORIZED DOMAIN"},status=status.HTTP_404_NOT_FOUND)
+            data['user']=request.user.id
+            data['created_by']=request.user.id
+            data['iu_id']=iu_master.id
+            current_time=int(timezone.now().timestamp())
+            data['timestamp']=current_time
+            parent_comm=request.data.get("parent_comment")
+            if parent_comm:
+                data['sub_comment']=True
+            serializer=CommentsSerializer(data=data)
+            if not serializer.is_valid():
+                return Response({"status":"errors","message":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
+            serializer.save()
+            return Response({"status":"success","message":"comment added successfully"},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+        
+    def delete(self,request):
+        try:
+            id=request.data.get('comment_id')
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            if not iu_master :
+                    return Response({"status":"error","message":"UNAUTHORIZED DOMAIN"},status=status.HTTP_404_NOT_FOUND)
+            user_role=get_user_roles(request)
+            if user_role in "publisher":
+                user_comment=Comments.objects.get(id=id,is_active=True,iu_id=iu_master)
+                if not user_comment.post.publisher == request.user:
+                    return Response({"status":"error","message":"unauthorized publisher for the post"},status=status.HTTP_400_BAD_REQUEST)
+            else:
+                user_comment=Comments.objects.get(id=id,user=request.user,is_active=True,iu_id=iu_master)
+            user_comment.is_removed_comment=True
+            user_comment.is_active=False
+            user_comment.save()
+            return Response({"status":"success","message":"comment deleted successfully"},status=status.HTTP_200_OK)
+        except Comments.DoesNotExist:
+            return Response({"status":"error","message":"Comments does not exist"},status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+
+class LikeAPI(APIView):
+    def get(self,request):
+        try:
+            post_id=request.query_params.get('post_id',None)
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            post=PostDetails.objects.get(pk=post_id,is_active=True,iu_id=iu_master,is_archived=False,post_status='published')
+            req_det=GetCustomUserSerializer(post.likes_users_list.all(),many=True)
+            return Response({"status":"success","message":req_det.data},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+    
+    def put(self,request):
+        try:
+            user=request.user
+            post_id=request.data.get('post_id')
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            Post_detail=PostDetails.objects.get(id=post_id,is_active=True,iu_id=iu_master,post_status='published',is_archived=False)
+            user_like=Post_detail.likes_users_list.filter(id=user.id).count()
+            print(user_like)
+            if user_like>0:
+                Post_detail.likes_users_list.remove(user)
+                return Response({"status":"success","message":"like removed successfully"},status=status.HTTP_200_OK)
+            Post_detail.likes_users_list.add(user)
+            return Response({"status":"success","message":"like addeds successfully"},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+        
+class ShareAPi(APIView):
+    def get(self,request):
+        try:
+            post_id=request.query_params.get('post_id',None)
+            if post_id is None:
+              return Response({"status":"error","message":"post_id is required"},status=status.HTTP_400_BAD_REQUEST)
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            post=PostDetails.objects.get(pk=post_id,is_active=True,iu_id=iu_master,is_archived=False,post_status='published')
+            req_det=GetCustomUserSerializer(post.shared_users_list.all(),many=True)
+            return Response({"status":"success","message":req_det.data},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+    
+    def post(self,request):
+        try:
+            user=request.user
+            post_id=request.data.get('post_id')
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_master = get_iuobj(domain)
+            Post_detail=PostDetails.objects.get(id=post_id,is_active=True,iu_id=iu_master,post_status='published',is_archived=False)
+            Post_detail.shared_users_list.add(user)
+            return Response({"status":"success","message":"post shared successfully"},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
 
 
