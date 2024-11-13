@@ -3,8 +3,8 @@ from datetime import datetime
 from django.utils import timezone
 from rest_framework.views import APIView,status
 from rest_framework.response import Response
-from events.serializers import EventDetailsSerializer,GetEventDetailsSerializer,EventBookingDetailsSerializer
-from events.models import EventDetails
+from events.serializers import EventDetailsSerializer,GetEventDetailsSerializer,EventBookingDetailsSerializer,GetEventBookingDetailsSerializer
+from events.models import EventDetails,EventBookingDetails
 from users.models import PublisherProfile
 from users.auth import get_user_roles
 from django.conf import settings
@@ -185,6 +185,34 @@ class EventApproval(APIView):
         return Response({"status":"success","message":"Event details updated successfully"})
 
 class EventBookingDetailsView(APIView):
+    def get(self, request):
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        event_id = request.query_params.get('event_id',None)
+        iu_master = get_iuobj(domain)
+        
+        if not iu_master:
+            return Response({"status": "error", "message": "Unauthorized domain"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        user_roles = get_user_roles(request)
+
+        if user_roles == 'eventorganiser':
+            if not event_id:
+                return Response({"status": "error", "message": "event_id is required for event organizers"}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                event_obj = EventDetails.objects.get(id=event_id, is_active=True, iu_id=iu_master)
+                bookings = EventBookingDetails.objects.filter(event=event_obj, is_active=True)
+            except EventDetails.DoesNotExist:
+                return Response({"status": "error", "message": "Event not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        elif user_roles == 'consumer':
+            bookings = EventBookingDetails.objects.filter(user=request.user, is_active=True)
+        
+        else:
+            return Response({"status": "error", "message": "Unauthorized role"}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = GetEventBookingDetailsSerializer(bookings, many=True)
+        return Response({"status": "success", "data": serializer.data}, status=status.HTTP_200_OK)
+
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         event_id = request.data.get('event')
