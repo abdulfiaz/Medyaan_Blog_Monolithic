@@ -245,18 +245,17 @@ class EventBookingDetailsView(APIView):
         data['total']=total
 
         serializer = EventBookingDetailsSerializer(data=data)
-
+        
         if not serializer.is_valid():
             transaction.rollback()
             return Response({"status":"error","message":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
         
+        event_obj.event_member_limit-=no_of_tickets
+        event_obj.save()
         event_booking = serializer.save()
         transaction.commit()
         return Response({"status":"success","message":"Event booking created successfully","data":{'id':event_booking.id,'booking_date':event_booking.booking_date}},status=status.HTTP_201_CREATED)
 
-
-            
-        
 
         
 

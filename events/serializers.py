@@ -29,10 +29,12 @@ class GetEventBookingDetailsSerializer(serializers.ModelSerializer):
     user_profile = serializers.SerializerMethodField()
     event_detail_status = serializers.SerializerMethodField()
     total_ticket_price = serializers.SerializerMethodField()
+    latitude=serializers.SerializerMethodField()
+    longitude=serializers.SerializerMethodField()
 
     class Meta:
         model = EventBookingDetails
-        fields = ['id', 'no_of_tickets', 'booking_status', 'payment_status','event_detail_status', 'total_ticket_price', 'booking_date', 'user_profile']
+        fields = ['id', 'no_of_tickets', 'booking_status', 'payment_status','event_detail_status', 'total_ticket_price', 'booking_date','latitude','longitude','user_profile']
     
     def get_user_profile(self, obj):
         profile = obj.user.userdetails.first()
@@ -48,4 +50,9 @@ class GetEventBookingDetailsSerializer(serializers.ModelSerializer):
     
     def get_total_ticket_price(self, obj):
         return obj.total
-
+    
+    def get_latitude(self,obj):
+        return obj.event.latitude
+        
+    def get_longitude(self,obj):
+        return obj.event.longitude
