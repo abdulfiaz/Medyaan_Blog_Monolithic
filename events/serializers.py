@@ -29,17 +29,22 @@ class GetEventBookingDetailsSerializer(serializers.ModelSerializer):
     user_profile = serializers.SerializerMethodField()
     event_detail_status = serializers.SerializerMethodField()
     total_ticket_price = serializers.SerializerMethodField()
-    latitude=serializers.SerializerMethodField()
-    longitude=serializers.SerializerMethodField()
+    event_organizer = serializers.SerializerMethodField()
+    event_name = serializers.CharField(source='event.name')
+    event_amount = serializers.DecimalField(source='event.event_amount', max_digits=10, decimal_places=2)
+    event_longitude = serializers.CharField(source='event.longitude', default=None)
+    event_latitude = serializers.CharField(source='event.latitude', default=None)
+    event_address = serializers.CharField(source='event.address', default=None)
 
     class Meta:
         model = EventBookingDetails
-        fields = ['id', 'no_of_tickets', 'booking_status', 'payment_status','event_detail_status', 'total_ticket_price', 'booking_date','latitude','longitude','user_profile']
+        fields = ['id', 'no_of_tickets', 'booking_status', 'payment_status','event_detail_status', 'total_ticket_price', 'booking_date','event_name','event_amount','event_longitude','event_latitude','event_address','user_profile','event_organizer']
+
     
     def get_user_profile(self, obj):
         profile = obj.user.userdetails.first()
         if profile:
-            return {'id': profile.id,'firstname': profile.firstname,'lastname': profile.lastname,'mobile_number': profile.user.mobile_number,'email': profile.user.email }
+            return {'id': profile.id,'firstname': profile.firstname,'lastname': profile.lastname,'mobile_number': profile.user.mobile_number,'email': profile.user.email,'address':profile.primary_address }
         return None
 
     def get_event_detail_status(self, obj):
@@ -50,9 +55,23 @@ class GetEventBookingDetailsSerializer(serializers.ModelSerializer):
     
     def get_total_ticket_price(self, obj):
         return obj.total
-    
-    def get_latitude(self,obj):
-        return obj.event.latitude
-        
-    def get_longitude(self,obj):
-        return obj.event.longitude
+
+    def get_event_organizer(self, obj):
+        organizer = obj.event.event_organizer
+        organizer_profile = organizer.userdetails.first() 
+
+        if organizer_profile:
+            return {
+                'id': organizer.id,
+                'firstname': organizer_profile.firstname,
+                'lastname': organizer_profile.lastname,
+                'email': organizer.email,
+                'primary_address': organizer_profile.primary_address,
+                'secondary_address': organizer_profile.secondary_address
+            }
+        return None
+
+
+
+
+

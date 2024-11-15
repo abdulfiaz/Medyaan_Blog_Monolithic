@@ -4,11 +4,29 @@ from rest_framework.response import Response
 from posts.serializers import *
 from posts.models import *
 from users.models import *
-from users.auth import get_user_roles
+from users.auth import get_user_roles,upload_image_s3
 from django.conf import settings
 from adminapp.iudetail import get_iuobj    
 from django.db import transaction
 from django.utils import timezone
+from rest_framework.parsers import MultiPartParser, FormParser
+import json
+from rest_framework.decorators import api_view, parser_classes
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def upload_images(request):
+    if 'images' not in request.FILES:
+        return Response({"status": "error", "message": "No images provided"}, status=400)
+
+    image_data = []
+    
+    for image_file in request.FILES.getlist('images'):
+        file_name = image_file.name
+        image_url = upload_image_s3(image_file, file_name)
+        image_data.append({"url": image_url})
+    
+    return Response({"status": "success", "image_urls": image_data}, status=201)
 
 
 # category view for posts i.e sports,education...
@@ -126,7 +144,7 @@ class PostDetailsView(APIView):
     def get(self,request):
         try:
             category_id=request.query_params.get('category_id',None)
-            publisher_user_id=request.query_params.get('user_id',None)
+            publisher_user_id=request.query_params.get('publisher',None)
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_master = get_iuobj(domain)
             if not iu_master :

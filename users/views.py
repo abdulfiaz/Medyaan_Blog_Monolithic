@@ -13,9 +13,9 @@ from django.db.models import QuerySet
 from django.conf import settings    
 from users.serializers import CustomUserSerializer, UserPersonalProfileSerializer,GetCustomUserSerializer,PublisherProfileSerializer,GetPublisherProfileSerializer
 from adminapp.iudetail import get_iuobj
-from users.auth import get_user_roles
-from rest_framework.exceptions import AuthenticationFailed
-from django.shortcuts import get_object_or_404
+from users.auth import get_user_roles,upload_image_s3
+import json
+
 
 
 @api_view(['POST'])
@@ -217,12 +217,11 @@ class CreateCustomUserView(APIView):
         
 
         user_profile_serializer = UserPersonalProfileSerializer(data=data_user)
-        try:
-            if user_profile_serializer.is_valid():
-                user_profile_serializer.save()
-                transaction.commit()
-                return Response({"status":"success","message": "User created successfully!"}, status=status.HTTP_201_CREATED)
-        except:
+        if user_profile_serializer.is_valid():
+            user_profile_serializer.save()
+            transaction.commit()
+            return Response({"status":"success","message": "User created successfully!"}, status=status.HTTP_201_CREATED)
+        else:
             transaction.rollback()
             return Response(user_profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
              

@@ -8,7 +8,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
     confirm_password = serializers.CharField(write_only=True) 
     class Meta:
         model = CustomUser
-        fields = ['mobile_number', 'email','password','temp_code', 'is_approval', 'approved_by', 'iu_id','created_by','modified_by','confirm_password','is_active']
+        fields = ['mobile_number', 'email','password','temp_code', 'is_approval', 'approved_by', 'iu_id','created_by','modified_by','confirm_password']
     
     def validate(self, data):
         if 'password' in data:
@@ -21,7 +21,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
 class UserPersonalProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserPersonalProfile
-        fields = '__all__'
+        fields = ['user','firstname','lastname','profilephoto','gender','age','language','primary_address','secondary_address','iu_id','created_by','modified_by']
 
 
 class GetCustomUserSerializer(serializers.ModelSerializer):
