@@ -256,7 +256,37 @@ class EventBookingDetailsView(APIView):
         transaction.commit()
         return Response({"status":"success","message":"Event booking created successfully","data":{'id':event_booking.id,'booking_date':event_booking.booking_date}},status=status.HTTP_201_CREATED)
 
-
+    def put(self,request):
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        iu_master = get_iuobj(domain)
+        transaction.set_autocommit(False)
+        if not iu_master :
+            return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
+        event_registration_id=request.data.get("event_registration_id")
+        if not event_registration_id:
+            transaction.rollback()
+            return Response({"status":"error","message":"event id is required"},status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            event_registered_detail=EventBookingDetails.objects.get(id=event_registration_id,iu_id=iu_master,is_active=True,is_archived=False,user=request.user)
+        except EventBookingDetails.DoesNotExist:
+            transaction.rollback()
+            return Response({"status":"error","message":"regestration details does not exist"},status=status.HTTP_400_BAD_REQUEST)
+        
+        event_registered_detail.booking_status='cancelled'
+        if event_registered_detail.payment_status =='paid':
+            event_registered_detail.refund_status='refunded'
+        event_registered_detail.save()
+        
+        try:
+            event_detail=EventDetails.objects.get(id=event_registered_detail.event.id,is_active=True,iu_id=iu_master,is_archived=False)
+        except EventDetails.DoesNotExist:
+            transaction.rollback()
+            return Response({"status":"error","message":"event does not found"},status=status.HTTP_400_BAD_REQUEST)
+        event_detail.event_member_limit+=event_registered_detail.no_of_tickets
+        event_detail.save()
+        transaction.commit()
+        return Response({"status":"success","message":"tickets cancelled successfully"},status=status.HTTP_200_OK)
         
 
 
