@@ -38,8 +38,8 @@ class EventDetailsView(APIView):
 
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
-        if not iu_master :
+        iu_obj = get_iuobj(domain)
+        if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)        
 
         user_role = get_user_roles(request)
@@ -47,7 +47,7 @@ class EventDetailsView(APIView):
         if user_role != 'eventorganiser':
             return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
         
-        eventorganizer_status = PublisherProfile.objects.get(user=request.user,is_active=True,role_type='eventorganiser',is_rejected=False,iu_id=iu_master)
+        eventorganizer_status = PublisherProfile.objects.get(user=request.user,is_active=True,role_type='eventorganiser',is_rejected=False,iu_id=iu_obj)
         if eventorganizer_status.approved_status != 'approved':
             return Response({"status":"error","message":"Your approval is still pending!"},status=status.HTTP_401_UNAUTHORIZED)
         
@@ -55,7 +55,7 @@ class EventDetailsView(APIView):
         data = request.data
         data['event_organizer'] = request.user.id
         data['created_by'] = request.user.id
-        data['iu_id']=iu_master.id
+        data['iu_id']=iu_obj.id
 
         serializer = EventDetailsSerializer(data=data)
 
@@ -71,15 +71,15 @@ class EventDetailsView(APIView):
         event_id = request.data.get('event_id')
 
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
-        if not iu_master :
+        iu_obj = get_iuobj(domain)
+        if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
         
         if not event_id:
             return Response({"status":"error","message":"event_id is required"},status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            event_obj = EventDetails.objects.get(id=event_id,event_organizer=request.user,event_status='published',is_active=True,iu_id=iu_master)
+            event_obj = EventDetails.objects.get(id=event_id,event_organizer=request.user,event_status='published',is_active=True,iu_id=iu_obj)
         except EventDetails.DoesNotExist:
             return Response({"status":"error","message":"Event not found"},status=status.HTTP_404_NOT_FOUND)
         
@@ -102,16 +102,16 @@ class EventDetailsView(APIView):
         try:
             event_id = request.data.get('event_id')
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
-            if not iu_master :
+            iu_obj = get_iuobj(domain)
+            if not iu_obj :
                 return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)        
 
             user_role = get_user_roles(request)
             try:
                 if user_role == 'manager':
-                    event_obj = EventDetails.objects.get(id=event_id,event_status='published',is_active=True,iu_id=iu_master)
+                    event_obj = EventDetails.objects.get(id=event_id,event_status='published',is_active=True,iu_id=iu_obj)
                 elif user_role == 'eventorganiser':
-                    event_obj = EventDetails.objects.get(id=event_id,event_status='published',is_active=True,event_organizer=request.user.id,iu_id=iu_master)
+                    event_obj = EventDetails.objects.get(id=event_id,event_status='published',is_active=True,event_organizer=request.user.id,iu_id=iu_obj)
             except EventDetails.DoesNotExist:
                 return Response({"status":"error","message":"event not found"},status=status.HTTP_404_NOT_FOUND)
             
@@ -131,8 +131,8 @@ class EventApproval(APIView):
         user_role = get_user_roles(request)
         
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
-        if not iu_master:
+        iu_obj = get_iuobj(domain)
+        if not iu_obj:
             return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
 
         if user_role != 'manager':
@@ -141,7 +141,7 @@ class EventApproval(APIView):
         # to count the total of aproved_status'pending,approved,rejected' and total of all publisher,eventorganiser
         counts = {}
         
-        all_data = EventDetails.objects.filter(iu_id=iu_master, is_active=True)
+        all_data = EventDetails.objects.filter(iu_id=iu_obj, is_active=True)
         events = all_data.filter(event_status=approved_status)
 
         counts['total_posts'] = all_data.count()
@@ -155,8 +155,8 @@ class EventApproval(APIView):
     def put(self,request):
         event_id=request.data.get("event_id")
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
-        if not iu_master :
+        iu_obj = get_iuobj(domain)
+        if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)        
 
         user_role = get_user_roles(request)
@@ -165,14 +165,14 @@ class EventApproval(APIView):
             return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
         
         try:
-            event_obj = EventDetails.objects.get(id=event_id,event_status='pending',is_active=True,iu_id=iu_master)
+            event_obj = EventDetails.objects.get(id=event_id,event_status='pending',is_active=True,iu_id=iu_obj)
         except EventDetails.DoesNotExist:
             return Response({"status":"error","message":"Event not found"},status=status.HTTP_404_NOT_FOUND)
         
         transaction.set_autocommit(False)
         data=request.data
         data['modified_by']=request.user.id
-        data['iu_id']=iu_master.id
+        data['iu_id']=iu_obj.id
 
         serializer = EventDetailsSerializer(event_obj,data=data,partial=True)
 
@@ -188,9 +188,9 @@ class EventBookingDetailsView(APIView):
     def get(self, request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         event_id = request.query_params.get('event_id',None)
-        iu_master = get_iuobj(domain)
+        iu_obj = get_iuobj(domain)
         
-        if not iu_master:
+        if not iu_obj:
             return Response({"status": "error", "message": "Unauthorized domain"}, status=status.HTTP_401_UNAUTHORIZED)
         
         user_roles = get_user_roles(request)
@@ -199,13 +199,13 @@ class EventBookingDetailsView(APIView):
             if not event_id:
                 return Response({"status": "error", "message": "event_id is required for event organizers"}, status=status.HTTP_400_BAD_REQUEST)
             try:
-                event_obj = EventDetails.objects.get(id=event_id, is_active=True, iu_id=iu_master)
-                bookings = EventBookingDetails.objects.filter(event=event_obj, is_active=True)
+                event_obj = EventDetails.objects.get(id=event_id, is_active=True, iu_id=iu_obj)
+                bookings = EventBookingDetails.objects.filter(event=event_obj, is_active=True,iu_id=iu_obj)
             except EventDetails.DoesNotExist:
                 return Response({"status": "error", "message": "Event not found"}, status=status.HTTP_404_NOT_FOUND)
         
         elif user_roles == 'consumer':
-            bookings = EventBookingDetails.objects.filter(user=request.user, is_active=True)
+            bookings = EventBookingDetails.objects.filter(user=request.user, is_active=True,iu_id=iu_obj)
         
         else:
             return Response({"status": "error", "message": "Unauthorized role"}, status=status.HTTP_403_FORBIDDEN)
@@ -217,30 +217,30 @@ class EventBookingDetailsView(APIView):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         event_id = request.data.get('event')
         no_of_tickets = request.data.get('no_of_tickets',1)
-        iu_master = get_iuobj(domain)
-        if not iu_master :
+        iu_obj = get_iuobj(domain)
+        if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)  
         
         if not event_id:
             return Response({"status":"error","message":"event id is required"},status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            event_obj = EventDetails.objects.get(id=event_id,iu_id=iu_master,is_active=True)
+            event_obj = EventDetails.objects.get(id=event_id,iu_id=iu_obj,is_active=True)
         except EventDetails.DoesNotExist:
             return Response({"status":"error","message":"event details not found!"},status=status.HTTP_404_NOT_FOUND)
         
-        payment_status_obj = 'paid' if event_obj.payment_needed else 'unpaid'
+        # payment_status_obj = True if event_obj.payment_needed else False
 
         sub_total = no_of_tickets * event_obj.event_amount
-        vat = (0+event_obj.event_amount)/100
+        vat = (settings.VAT+event_obj.event_amount)/100
         total = vat + sub_total
 
         transaction.set_autocommit(False)
         data=request.data
-        data['iu_id']=iu_master.id
+        data['iu_id']=iu_obj.id
         data['user']=request.user.id
         data['created_by']=request.user.id
-        data['payment_status']=payment_status_obj
+        # data['payment_status']=payment_status_obj
         data['sub_total']=sub_total
         data['total']=total
 

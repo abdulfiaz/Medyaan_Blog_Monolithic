@@ -29,7 +29,7 @@ class EventBookingDetails(BaseModel):
     event_details = JSONField(default=dict, blank=True)
     booking_date = models.DateTimeField(auto_now_add=True)
     no_of_tickets = models.IntegerField(default=1)
-    payment_status = models.CharField(default='unpaid',max_length=20)
+    payment_status = models.BooleanField(default=False) #false means unpaid and true meand paid
     booking_status = models.CharField(default='confirmed',max_length=20)
     cancellation_reason = models.CharField(max_length=100,null=True,blank=True)
     refund_status = models.CharField(default='pending',max_length=20)

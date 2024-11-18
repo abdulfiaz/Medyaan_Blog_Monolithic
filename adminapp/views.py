@@ -8,16 +8,16 @@ from adminapp.models import IUMaster
 
 class IUMasterAPI(APIView):
     def get(self, request):
-        iu_id = request.query_params.get('iu_id')
+        id = request.query_params.get('id')
         rolename = get_user_roles(request)
 
         if rolename != 'admin':
             return Response({"status": "error", "message": "Only admin can have the access!"}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            if iu_id:
+            if id:
                 try:
-                    iumaster = IUMaster.objects.get(id=iu_id, is_active=True)
+                    iumaster = IUMaster.objects.get(id=id, is_active=True)
                 except IUMaster.DoesNotExist:
                     return Response({"status": "error", "message": "IUMaster not found"}, status=status.HTTP_404_NOT_FOUND)
                 serializer = IUMasterSerializer(iumaster)
@@ -48,17 +48,17 @@ class IUMasterAPI(APIView):
             return Response({"status": "error", "message":  serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
-        iu_id = request.data.get('iu_id')
+        id = request.data.get('id')
         rolename = get_user_roles(request)
 
         if rolename != "admin":
             return Response({"status": "error", "message": "Only admin can access this!"}, status=status.HTTP_403_FORBIDDEN)
 
-        if not iu_id:
-            return Response({"status":"error","message":"iu_id is required"})
+        if not id:
+            return Response({"status":"error","message":"id is required"})
         
         try:
-            iumaster = IUMaster.objects.get(id=iu_id, is_active=True)
+            iumaster = IUMaster.objects.get(id=id, is_active=True)
         except IUMaster.DoesNotExist:
             return Response({"status": "error", "message": "IUMaster not found"}, status=status.HTTP_404_NOT_FOUND)
         
@@ -77,16 +77,16 @@ class IUMasterAPI(APIView):
             return Response({"status": "error", "message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request):
-        iu_id = request.data.get('iu_id')
+        id = request.data.get('id')
         rolename = get_user_roles(request)
 
         if rolename != "admin":
             return Response({"status": "error", "message": "Only admin can access this!"}, status=status.HTTP_403_FORBIDDEN)
-        if not iu_id:
-            return Response({"status":"error","message":"iu_id is required"})
+        if not id:
+            return Response({"status":"error","message":"id is required"})
         
         try:
-            iumaster = IUMaster.objects.get(id=iu_id, is_active=True)
+            iumaster = IUMaster.objects.get(id=id, is_active=True)
         except IUMaster.DoesNotExist:
             return Response({"status": "error", "message": "IUMaster not found"}, status=status.HTTP_404_NOT_FOUND)
 

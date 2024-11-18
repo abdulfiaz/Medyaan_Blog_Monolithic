@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Ticket</title>
+  <style>
+
+    .info-title {
+      font-weight: bold;
+    }
+    .qr-code img {
+      width: 100px;
+      height: 100px;
+    }
+   
+    table {
+      width: 100%;
+      margin-bottom: 20px;
+    }
+    td {
+      vertical-align: top;
+    }
+  </style>
+</head>
+<body>
+
+<div >
+  <center><h1 style="margin-bottom: -5px;font-size: 27px;">Event Ticket</h1></center>
+  <p style="text-align: center;margin-top: -10px;margin-bottom: 50px;font-size: 15px;">Medyaan Blogger</p>
+
+  <table>
+    <tr>
+      <td style="width: 70%;">
+        <h5 style="font-size: 15px;">Ticket Information</h5>
+        <p style="font-size: 12px;margin-left: 20px;"><span class="info-title" style="font-size: 12px;">Event Number:</span> {{ event.id }}</p>
+        <p style="font-size: 12px;margin-left: 20px;"><span class="info-title" style="font-size: 12px;">Ticket Number:</span> {{ booking.id }}</p>
+      </td>
+      <td style="text-align: right; width: 30%;">
+        <div class="qr-code">
+          <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code">
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <hr>
+
+  <h5 style="font-size: 15px;margin-bottom: 15px;margin-top: 30px;">Event Information</h5>
+  <table>
+    <tr>
+      <td style="width: 50%;">
+        <p style="font-size: 12px;margin-left: 20px;"><span class="info-title" style="font-size: 12px;">Name:</span> {{ event.name }}</p>
+        <p style="font-size: 12px;margin-left: 20px;"><span class="info-title" style="font-size: 12px;">Date & Time:</span> {{ event.event_date }}</p>
+        <p style="font-size: 12px;margin-left: 20px;"><span class="info-title" style="font-size: 12px;">No of Tickets:</span> {{ no_of_tickets }}</p>
+        <p style="font-size: 12px;margin-left: 20px;"><span class="info-title" style="font-size: 12px;">Venue:</span> {{ event.address }}</p>
+      </td>
+      <td style="width: 50%;">
+        <p style="font-size: 12px;margin-left: 20px;"><span class="info-title" style="font-size: 12px;">Total Amount:</span> {{ total_amount }}</p>
+        <p style="font-size: 12px;margin-left: 20px;"><span class="info-title" style="font-size: 12px;">Latitude:</span> {{ event.latitude }}</p>
+        <p style="font-size: 12px;margin-left: 20px;"><span class="info-title" style="font-size: 12px;">Longitude:</span> {{ event.longitude }}</p>
+      </td>
+    </tr>
+  </table>
+
+  <hr>
+
+  <h5 style="font-size: 15px;margin-bottom: 15px;margin-top: 30px;">User Information</h5>
+  <p style="margin-left: 20px; font-size: 12px;"><span class="info-title" style="font-size: 12px;">Name:</span> {{ user.firstname }} {{ user.lastname }}</p>
+  <p style="margin-left: 20px;font-size: 12px;"><span class="info-title" style="font-size: 12px;">Phone:</span> {{ user.user.mobile_number }}</p>
+  <p style="margin-left: 20px;font-size: 12px;"><span class="info-title" style="font-size: 12px;">Email:</span> {{ user.user.email }}</p>
+
+  <center><div >
+    <p style="margin-top: 420px;" >Thank you for choosing us. We are pleased to confirm your booking as above.</p>
+  </div></center>
+</div>
+
+</body>
+</html>

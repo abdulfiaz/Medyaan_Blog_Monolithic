@@ -52,8 +52,8 @@ class PostCategoryView(APIView):
 
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
-        if not iu_master :
+        iu_obj = get_iuobj(domain)
+        if not iu_obj :
             return Response({"status":"error","message":"IU not found"},status=status.HTTP_404_NOT_FOUND)
         
         user_role = get_user_roles(request)
@@ -63,7 +63,7 @@ class PostCategoryView(APIView):
         
         transaction.set_autocommit(False)
         data=request.data
-        data['iu_id']=iu_master.id
+        data['iu_id']=iu_obj.id
         data['created_by']=request.user.id
 
         serializer = PostCategorySerializer(data=data)
@@ -81,8 +81,8 @@ class PostCategoryView(APIView):
         user_role = get_user_roles(request)
 
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
-        if not iu_master :
+        iu_obj = get_iuobj(domain)
+        if not iu_obj :
             return Response({"status":"error","message":"IU not found"},status=status.HTTP_404_NOT_FOUND)
 
         if user_role != 'admin':
@@ -92,7 +92,7 @@ class PostCategoryView(APIView):
             return Response({"status":"error","message":"category_id is required"},status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            category_obj = PostCategory.objects.get(id=category_id,is_active=True,iu_id=iu_master)
+            category_obj = PostCategory.objects.get(id=category_id,is_active=True,iu_id=iu_obj)
         except PostCategory.DoesNotExist:
             return Response({"staus":"error","message":"Category not found !"},status=status.HTTP_404_NOT_FOUND)
         
@@ -116,8 +116,8 @@ class PostCategoryView(APIView):
             user_role = get_user_roles(request)
 
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
-            if not iu_master :
+            iu_obj = get_iuobj(domain)
+            if not iu_obj :
                 return Response({"status":"error","message":"IU not found"},status=status.HTTP_404_NOT_FOUND)
 
             if user_role != 'admin':
@@ -127,7 +127,7 @@ class PostCategoryView(APIView):
                 return Response({"status":"error","message":"category_id is required"},status=status.HTTP_403_FORBIDDEN)
             
             try:
-                category_obj = PostCategory.objects.get(id=category_id,is_active=True,iu_id=iu_master)
+                category_obj = PostCategory.objects.get(id=category_id,is_active=True,iu_id=iu_obj)
             except PostCategory.DoesNotExist:
                 return Response({"status":"error","message":"Category not found !"},status=status.HTTP_404_NOT_FOUND)
             
@@ -146,17 +146,17 @@ class PostDetailsView(APIView):
             category_id=request.query_params.get('category_id',None)
             publisher_user_id=request.query_params.get('publisher',None)
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
-            if not iu_master :
+            iu_obj = get_iuobj(domain)
+            if not iu_obj :
                 return Response({"status":"error","message":"UNAUTHORIZED DOMAIN"},status=status.HTTP_404_NOT_FOUND)
             if publisher_user_id:
-                publisher_detail=CustomUser.objects.get(id=publisher_user_id,is_active=True,iu_id=iu_master)
-                publish_user=PublisherProfile.objects.get(user=publisher_detail,is_active=True,iu_id=iu_master,approved_status='approved',role_type='publisher')
-                post=PostDetails.objects.filter(publisher=publish_user.user,iu_id=iu_master,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
+                publisher_detail=CustomUser.objects.get(id=publisher_user_id,is_active=True,iu_id=iu_obj)
+                publish_user=PublisherProfile.objects.get(user=publisher_detail,is_active=True,iu_id=iu_obj,approved_status='approved',role_type='publisher')
+                post=PostDetails.objects.filter(publisher=publish_user.user,iu_id=iu_obj,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
             elif category_id:
-                post=PostDetails.objects.filter(category_id=category_id,iu_id=iu_master,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
+                post=PostDetails.objects.filter(category_id=category_id,iu_id=iu_obj,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
             else:
-                post=PostDetails.objects.filter(iu_id=iu_master,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
+                post=PostDetails.objects.filter(iu_id=iu_obj,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
 
             serializer=GetPostDetailsSerializer(post,many=True)
             return Response({"status":"success","message":"Post Details","data":serializer.data},status=status.HTTP_200_OK)
@@ -165,8 +165,8 @@ class PostDetailsView(APIView):
         
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
-        if not iu_master :
+        iu_obj = get_iuobj(domain)
+        if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)        
 
         user_role = get_user_roles(request)
@@ -182,7 +182,7 @@ class PostDetailsView(APIView):
         data=request.data
         data['created_by']=request.user.id
         data['publisher']=request.user.id
-        data['iu_id']=iu_master.id
+        data['iu_id']=iu_obj.id
         
         serializer = PostDetailsSerializer(data=data)
 
@@ -198,15 +198,15 @@ class PostDetailsView(APIView):
         post_id = request.data.get('post_id')
 
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
-        if not iu_master :
+        iu_obj = get_iuobj(domain)
+        if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
         
         if not post_id:
             return Response({"status":"error","message":"post_id is required"},status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            post_obj=PostDetails.objects.get(id=post_id,publisher=request.user.id,post_status='published',is_active=True,iu_id=iu_master)
+            post_obj=PostDetails.objects.get(id=post_id,publisher=request.user.id,post_status='published',is_active=True,iu_id=iu_obj)
         except PostDetails.DoesNotExist:
             return Response({"status":"error","message":"Post not found!"},status=status.HTTP_404_NOT_FOUND)
         
@@ -228,16 +228,16 @@ class PostDetailsView(APIView):
         try:
             post_id = request.data.get('post_id')
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
-            if not iu_master :
+            iu_obj = get_iuobj(domain)
+            if not iu_obj :
                 return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)        
 
             user_role = get_user_roles(request)
             try:
                 if user_role == 'manager':
-                    post_obj = PostDetails.objects.get(id=post_id,post_status='published',is_active=True,iu_id=iu_master)
+                    post_obj = PostDetails.objects.get(id=post_id,post_status='published',is_active=True,iu_id=iu_obj)
                 elif user_role == 'publisher':
-                    post_obj = PostDetails.objects.get(id=post_id,post_status='published',is_active=True,publisher=request.user.id,iu_id=iu_master)
+                    post_obj = PostDetails.objects.get(id=post_id,post_status='published',is_active=True,publisher=request.user.id,iu_id=iu_obj)
             except PostDetails.DoesNotExist:
                 return Response({"status":"error","message":"post not found"},status=status.HTTP_404_NOT_FOUND)
             
@@ -257,8 +257,8 @@ class PostApprovalView(APIView):
         user_role = get_user_roles(request)
         
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
-        if not iu_master:
+        iu_obj = get_iuobj(domain)
+        if not iu_obj:
             return Response({'status': 'failure', 'message': 'Unauthorized domain'},status=status.HTTP_404_NOT_FOUND)
 
         if user_role != 'manager':
@@ -267,7 +267,7 @@ class PostApprovalView(APIView):
         # to count the total of aproved_status'pending,approved,rejected' and total of all publisher,eventorganiser
         
         counts = {}
-        all_data = PostDetails.objects.filter(iu_id=iu_master, is_active=True)
+        all_data = PostDetails.objects.filter(iu_id=iu_obj, is_active=True)
         posts = all_data.filter(post_status=approved_status)
 
         counts['total_posts'] = all_data.count()
@@ -282,8 +282,8 @@ class PostApprovalView(APIView):
     def put(self,request):
         post_id = request.data.get("post_id")
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
-        if not iu_master :
+        iu_obj = get_iuobj(domain)
+        if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
         
         user_role = get_user_roles(request)
@@ -292,7 +292,7 @@ class PostApprovalView(APIView):
             return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
         
         try:
-            post_obj=PostDetails.objects.get(id=post_id,post_status='pending',is_active=True,iu_id=iu_master)
+            post_obj=PostDetails.objects.get(id=post_id,post_status='pending',is_active=True,iu_id=iu_obj)
         except PostDetails.DoesNotExist:
             return Response({"status":"error","message":"Post not found"},status=status.HTTP_404_NOT_FOUND)
         
@@ -314,13 +314,13 @@ class CommentsView(APIView):
     def get(self,request):
         try:
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
+            iu_obj = get_iuobj(domain)
             post_id=request.query_params.get('post_id')
             parent_comment_id=request.query_params.get('parent_comment_id',None)
             if parent_comment_id is None:
-                comments_detail=Comments.objects.filter(is_active=True,iu_id=iu_master,post_id=post_id,is_removed_comment=False,parent_comment__isnull=True)
+                comments_detail=Comments.objects.filter(is_active=True,iu_id=iu_obj,post_id=post_id,is_removed_comment=False,parent_comment__isnull=True)
             else:
-                comments_detail=Comments.objects.filter(is_active=True,iu_id=iu_master,post_id=post_id,is_removed_comment=False,id=parent_comment_id)
+                comments_detail=Comments.objects.filter(is_active=True,iu_id=iu_obj,post_id=post_id,is_removed_comment=False,id=parent_comment_id)
             serializer=CommentsSerializer(comments_detail,many=True,fields=['id','message','list_tag_users','subcomments'])
             return Response({"status":"success","message":serializer.data},status=status.HTTP_200_OK)
         except Exception as e:
@@ -330,12 +330,12 @@ class CommentsView(APIView):
         try:
             data=request.data
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
-            if not iu_master :
+            iu_obj = get_iuobj(domain)
+            if not iu_obj :
                 return Response({"status":"error","message":"UNAUTHORIZED DOMAIN"},status=status.HTTP_404_NOT_FOUND)
             data['user']=request.user.id
             data['created_by']=request.user.id
-            data['iu_id']=iu_master.id
+            data['iu_id']=iu_obj.id
             current_time=int(timezone.now().timestamp())
             data['timestamp']=current_time
             parent_comm=request.data.get("parent_comment")
@@ -353,16 +353,16 @@ class CommentsView(APIView):
         try:
             id=request.data.get('comment_id')
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
-            if not iu_master :
+            iu_obj = get_iuobj(domain)
+            if not iu_obj :
                     return Response({"status":"error","message":"UNAUTHORIZED DOMAIN"},status=status.HTTP_404_NOT_FOUND)
             user_role=get_user_roles(request)
             if user_role in "publisher":
-                user_comment=Comments.objects.get(id=id,is_active=True,iu_id=iu_master)
+                user_comment=Comments.objects.get(id=id,is_active=True,iu_id=iu_obj)
                 if not user_comment.post.publisher == request.user:
                     return Response({"status":"error","message":"unauthorized publisher for the post"},status=status.HTTP_400_BAD_REQUEST)
             else:
-                user_comment=Comments.objects.get(id=id,user=request.user,is_active=True,iu_id=iu_master)
+                user_comment=Comments.objects.get(id=id,user=request.user,is_active=True,iu_id=iu_obj)
             user_comment.is_removed_comment=True
             user_comment.is_active=False
             user_comment.save()
@@ -377,8 +377,8 @@ class LikeAPI(APIView):
         try:
             post_id=request.query_params.get('post_id',None)
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
-            post=PostDetails.objects.get(pk=post_id,is_active=True,iu_id=iu_master,is_archived=False,post_status='published')
+            iu_obj = get_iuobj(domain)
+            post=PostDetails.objects.get(pk=post_id,is_active=True,iu_id=iu_obj,is_archived=False,post_status='published')
             req_det=GetCustomUserSerializer(post.likes_users_list.all(),many=True)
             return Response({"status":"success","message":req_det.data},status=status.HTTP_200_OK)
         except Exception as e:
@@ -389,8 +389,8 @@ class LikeAPI(APIView):
             user=request.user
             post_id=request.data.get('post_id')
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
-            Post_detail=PostDetails.objects.get(id=post_id,is_active=True,iu_id=iu_master,post_status='published',is_archived=False)
+            iu_obj = get_iuobj(domain)
+            Post_detail=PostDetails.objects.get(id=post_id,is_active=True,iu_id=iu_obj,post_status='published',is_archived=False)
             user_like=Post_detail.likes_users_list.filter(id=user.id).count()
             print(user_like)
             if user_like>0:
@@ -408,8 +408,8 @@ class ShareAPi(APIView):
             if post_id is None:
               return Response({"status":"error","message":"post_id is required"},status=status.HTTP_400_BAD_REQUEST)
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
-            post=PostDetails.objects.get(pk=post_id,is_active=True,iu_id=iu_master,is_archived=False,post_status='published')
+            iu_obj = get_iuobj(domain)
+            post=PostDetails.objects.get(pk=post_id,is_active=True,iu_id=iu_obj,is_archived=False,post_status='published')
             req_det=GetCustomUserSerializer(post.shared_users_list.all(),many=True)
             return Response({"status":"success","message":req_det.data},status=status.HTTP_200_OK)
         except Exception as e:
@@ -420,8 +420,8 @@ class ShareAPi(APIView):
             user=request.user
             post_id=request.data.get('post_id')
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-            iu_master = get_iuobj(domain)
-            Post_detail=PostDetails.objects.get(id=post_id,is_active=True,iu_id=iu_master,post_status='published',is_archived=False)
+            iu_obj = get_iuobj(domain)
+            Post_detail=PostDetails.objects.get(id=post_id,is_active=True,iu_id=iu_obj,post_status='published',is_archived=False)
             Post_detail.shared_users_list.add(user)
             return Response({"status":"success","message":"post shared successfully"},status=status.HTTP_200_OK)
         except Exception as e:
