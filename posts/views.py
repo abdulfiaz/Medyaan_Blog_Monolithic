@@ -133,6 +133,7 @@ class PostCategoryView(APIView):
             
             category_obj.is_active=False
             category_obj.is_archived=True
+            category_obj.modified_by=request.user.id
             category_obj.save()
 
             return Response({"status":"success","message":"category deleted successfully !"},status=status.HTTP_200_OK)
