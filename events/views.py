@@ -216,7 +216,7 @@ class EventBookingDetailsView(APIView):
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         event_id = request.data.get('event')
-        no_of_tickets = request.data.get('no_of_tickets',1)
+        no_of_tickets = request.data.get('no_of_tickets',0)
         iu_obj = get_iuobj(domain)
         if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)  
@@ -225,7 +225,7 @@ class EventBookingDetailsView(APIView):
             return Response({"status":"error","message":"event id is required"},status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            event_obj = EventDetails.objects.get(id=event_id,iu_id=iu_obj,is_active=True)
+            event_obj = EventDetails.objects.get(id=event_id,iu_id=iu_obj,is_active=True,event_status="published")
         except EventDetails.DoesNotExist:
             return Response({"status":"error","message":"event details not found!"},status=status.HTTP_404_NOT_FOUND)
         
@@ -260,22 +260,28 @@ class EventBookingDetailsView(APIView):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         iu_master = get_iuobj(domain)
         transaction.set_autocommit(False)
+       
         if not iu_master :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
+       
         event_registration_id=request.data.get("event_registration_id")
+       
         if not event_registration_id:
             transaction.rollback()
             return Response({"status":"error","message":"event id is required"},status=status.HTTP_400_BAD_REQUEST)
         
         try:
             event_registered_detail=EventBookingDetails.objects.get(id=event_registration_id,iu_id=iu_master,is_active=True,is_archived=False,user=request.user)
+       
         except EventBookingDetails.DoesNotExist:
             transaction.rollback()
             return Response({"status":"error","message":"regestration details does not exist"},status=status.HTTP_400_BAD_REQUEST)
         
         event_registered_detail.booking_status='cancelled'
+       
         if event_registered_detail.payment_status =='paid':
             event_registered_detail.refund_status='refunded'
+        event_registered_detail.modified_by=request.user.id
         event_registered_detail.save()
         
         try:

@@ -22,9 +22,10 @@ class GetPostDetailsSerializer(serializers.ModelSerializer):
     likes_count=serializers.SerializerMethodField()
     comments_count=serializers.SerializerMethodField()
     shared_count=serializers.SerializerMethodField()
+    is_liked=serializers.SerializerMethodField()
     class Meta:
         model = PostDetails
-        fields = ['id', 'publisher', 'category', 'title', 'content', 'image', 'post_status','likes_count','comments_count','shared_count', 'user_profile',]
+        fields = ['id', 'publisher', 'category', 'title', 'content', 'image', 'post_status','likes_count','comments_count','shared_count', 'user_profile','is_liked']
 
     def get_user_profile(self, obj):
         profile = obj.publisher.userdetails.first()
@@ -39,6 +40,12 @@ class GetPostDetailsSerializer(serializers.ModelSerializer):
             return likes
         return 0
 
+    def get_is_liked(self, obj):
+        # Access the current user from the context
+        user = self.context.get('request').user
+        if user.is_authenticated:
+            return obj.likes_users_list.filter(id=user.id).exists()
+        return False
     def get_comments_count(self,obj):
         comments_detail=Comments.objects.filter(post=obj,iu_id=obj.iu_id,is_active=True,is_removed_comment=False)
         return comments_detail.count()

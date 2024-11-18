@@ -150,6 +150,7 @@ class PostDetailsView(APIView):
             iu_obj = get_iuobj(domain)
             if not iu_obj :
                 return Response({"status":"error","message":"UNAUTHORIZED DOMAIN"},status=status.HTTP_404_NOT_FOUND)
+           
             if publisher_user_id:
                 publisher_detail=CustomUser.objects.get(id=publisher_user_id,is_active=True,iu_id=iu_obj)
                 publish_user=PublisherProfile.objects.get(user=publisher_detail,is_active=True,iu_id=iu_obj,approved_status='approved',role_type='publisher')
@@ -197,7 +198,9 @@ class PostDetailsView(APIView):
     
     def put(self,request):
         post_id = request.data.get('post_id')
-
+        user_role = get_user_roles(request)
+        if user_role != 'publisher':
+            return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
         iu_obj = get_iuobj(domain)
         if not iu_obj :
@@ -317,7 +320,9 @@ class CommentsView(APIView):
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
             post_id=request.query_params.get('post_id')
+            
             parent_comment_id=request.query_params.get('parent_comment_id',None)
+            
             if parent_comment_id is None:
                 comments_detail=Comments.objects.filter(is_active=True,iu_id=iu_obj,post_id=post_id,is_removed_comment=False,parent_comment__isnull=True)
             else:
@@ -330,34 +335,47 @@ class CommentsView(APIView):
     def post(self,request):
         try:
             data=request.data
+            user_role = get_user_roles(request)
+          
+            if user_role != 'consumer':
+                return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
+          
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
             if not iu_obj :
                 return Response({"status":"error","message":"UNAUTHORIZED DOMAIN"},status=status.HTTP_404_NOT_FOUND)
+            
             data['user']=request.user.id
             data['created_by']=request.user.id
             data['iu_id']=iu_obj.id
             current_time=int(timezone.now().timestamp())
             data['timestamp']=current_time
-            parent_comm=request.data.get("parent_comment")
-            if parent_comm:
+            parent_comment=request.data.get("parent_comment")
+            if parent_comment:
                 data['sub_comment']=True
             serializer=CommentsSerializer(data=data)
+           
             if not serializer.is_valid():
                 return Response({"status":"errors","message":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
+           
             serializer.save()
+           
             return Response({"status":"success","message":"comment added successfully"},status=status.HTTP_200_OK)
+        
         except Exception as e:
             return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
         
     def delete(self,request):
         try:
             id=request.data.get('comment_id')
+          
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
             if not iu_obj :
                     return Response({"status":"error","message":"UNAUTHORIZED DOMAIN"},status=status.HTTP_404_NOT_FOUND)
+          
             user_role=get_user_roles(request)
+          
             if user_role in "publisher":
                 user_comment=Comments.objects.get(id=id,is_active=True,iu_id=iu_obj)
                 if not user_comment.post.publisher == request.user:
@@ -376,6 +394,7 @@ class CommentsView(APIView):
 class LikeAPI(APIView):
     def get(self,request):
         try:
+            
             post_id=request.query_params.get('post_id',None)
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
@@ -387,17 +406,26 @@ class LikeAPI(APIView):
     
     def put(self,request):
         try:
+            user_role = get_user_roles(request)
+          
+            if user_role != 'consumer':
+                return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
+          
             user=request.user
+            
             post_id=request.data.get('post_id')
+            
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
             Post_detail=PostDetails.objects.get(id=post_id,is_active=True,iu_id=iu_obj,post_status='published',is_archived=False)
             user_like=Post_detail.likes_users_list.filter(id=user.id).count()
-            print(user_like)
+            
             if user_like>0:
                 Post_detail.likes_users_list.remove(user)
                 return Response({"status":"success","message":"like removed successfully"},status=status.HTTP_200_OK)
+            
             Post_detail.likes_users_list.add(user)
+            
             return Response({"status":"success","message":"like addeds successfully"},status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
@@ -405,6 +433,7 @@ class LikeAPI(APIView):
 class ShareAPi(APIView):
     def get(self,request):
         try:
+            
             post_id=request.query_params.get('post_id',None)
             if post_id is None:
               return Response({"status":"error","message":"post_id is required"},status=status.HTTP_400_BAD_REQUEST)
@@ -418,6 +447,9 @@ class ShareAPi(APIView):
     
     def post(self,request):
         try:
+            user_role = get_user_roles(request)
+            if user_role != 'consumer':
+                return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
             user=request.user
             post_id=request.data.get('post_id')
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
