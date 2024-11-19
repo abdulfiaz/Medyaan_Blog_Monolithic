@@ -79,3 +79,17 @@ class PublisherProfile(BaseModel):
     class Meta:
         db_table='publisher_profile'
         ordering = ['created_at']
+
+class ApprovedProfiles(BaseModel):
+    user=models.ForeignKey(CustomUser,on_delete=models.CASCADE,related_name='approvedprofiles_user_id')
+    description=models.TextField(blank=True,null=True)
+    experience=models.TextField(blank=True,null=True)
+    document=ArrayField(JSONField(),default=list,blank=True)
+    website_link=models.TextField(blank=True,null=True)
+    is_approved=models.BooleanField(default=True)
+    role_type=models.CharField(max_length=50,blank=True,null=True)
+    iu_id=models.ForeignKey(IUMaster,related_name='approvedprofiles_iu',on_delete = models.CASCADE)
+
+    class Meta:
+        db_table='approved_profiles'
+        ordering = ['created_at']

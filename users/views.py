@@ -1,3 +1,4 @@
+from django.forms import model_to_dict
 from django.shortcuts import render
 from django.contrib.auth.hashers import make_password,check_password
 from rest_framework.decorators import api_view,permission_classes
@@ -11,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework import status
 from django.db.models import QuerySet
 from django.conf import settings    
-from users.serializers import CustomUserSerializer, UserPersonalProfileSerializer,GetCustomUserSerializer,PublisherProfileSerializer,GetPublisherProfileSerializer
+from users.serializers import CustomUserSerializer, UserPersonalProfileSerializer,GetCustomUserSerializer,PublisherProfileSerializer,GetPublisherProfileSerializer,ApprovedProfileSerializer
 from adminapp.iudetail import get_iuobj
 from users.auth import get_user_roles,upload_image_s3
 import json
@@ -53,12 +54,14 @@ def switch_role(request):
         try:
             transaction.set_autocommit(False)
             user=request.user
-            role_id=request.data.get('role_id')
-            role=RoleMaster.objects.get(id=role_id,is_active=True)
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
             if not iu_obj:
                 return Response({'status': 'error', 'message': 'UNAUTHORIZED DOMAIN.'},status=status.HTTP_404_NOT_FOUND)
+            role_id=request.data.get('role_id')
+            role=RoleMaster.objects.get(id=role_id,is_active=True,iu_id=iu_obj)
+            
+            
             try:
                 user_role=RoleMapping.objects.get(user=user,role=role,iu_id=iu_obj)
             except RoleMapping.DoesNotExist:
@@ -349,7 +352,7 @@ class ManagerApprovalView(APIView):
         return Response({"status":"success","message":"data retrieved successfully","data": user_data.data,"counts": counts}, status=status.HTTP_200_OK)
 
     def put(self,request):
-        user_id = request.data.get('user_id')
+        user_id = request.data.get('profile_id')
         
         user_role = get_user_roles(request)
         
@@ -376,12 +379,20 @@ class ManagerApprovalView(APIView):
             data['is_rejected']=True
 
         serializer=PublisherProfileSerializer(user,data=data,partial=True)
-
+        
         if not serializer.is_valid():
             transaction.rollback()
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
         serializer.save()
+        
+        user_data=model_to_dict(user)
+        approved_status=request.data.get("approved_status")
+        if approved_status =="approved":
+            approved_profiles=ApprovedProfileSerializer(data=user_data)
+            if not approved_profiles.is_valid():
+                transaction.rollback()
+                return Response(approved_profiles.errors, status=status.HTTP_400_BAD_REQUEST)
+            approved_profiles.save()
         transaction.commit()
         return Response({"status":"success","message":"User details updated successfully"})
     

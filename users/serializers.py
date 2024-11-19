@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from users.models import CustomUser, UserPersonalProfile, RoleMaster,PublisherProfile
+from users.models import CustomUser, UserPersonalProfile, RoleMaster,PublisherProfile,ApprovedProfiles
 from adminapp.models import IUMaster
 from django.contrib.auth.hashers import make_password,check_password
 
@@ -47,3 +47,8 @@ class GetPublisherProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model=PublisherProfile
         fields=['id','role_type','description','experience','document','approved_status','reason']
+
+class ApprovedProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=ApprovedProfiles
+        fields='__all__'
