@@ -16,7 +16,7 @@ from users.serializers import CustomUserSerializer, UserPersonalProfileSerialize
 from adminapp.iudetail import get_iuobj
 from users.auth import get_user_roles,upload_image_s3
 import json
-
+from django.db.models import Q
 
 
 @api_view(['POST'])
@@ -397,4 +397,46 @@ class ManagerApprovalView(APIView):
         return Response({"status":"success","message":"User details updated successfully"})
     
 
-     
+class SerachView(APIView):
+    def get(self,request):
+        email = request.query_params.get('email')
+        search = request.query_params.get('search')
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        iu_obj = get_iuobj(domain)
+
+        if not iu_obj:
+            return Response({'status': 'failure', 'message': 'IU domain not found.'},status=status.HTTP_404_NOT_FOUND)
+        
+        user_role = get_user_roles(request)
+        
+        if user_role != 'admin':
+            return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
+        
+        if email:
+            try:
+                user_obj = CustomUser.objects.filter(email__istartswith=email,is_active=True,iu_id=iu_obj)
+                serializer = GetCustomUserSerializer(user_obj,many=True)
+                return Response({"status": "success","message":"Data retrived successfully","data": serializer.data}, status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        try:
+            if search.isdigit():
+                user_obj = CustomUser.objects.filter(mobile_number__startswith=search, is_active=True,iu_id=iu_obj)
+            else:
+                user_obj = CustomUser.objects.filter(userdetails__firstname__istartswith=search ,is_active=True,iu_id=iu_obj)
+                
+        except Exception as e:
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
+
+        serializer = GetCustomUserSerializer(user_obj,many=True)    
+        return Response({"status": "success","message":"Data retrived successfully","data": serializer.data}, status=status.HTTP_200_OK)
+
+
+
+        
+
+
+        
+        
+

@@ -11,4 +11,5 @@ urlpatterns = [
     path('role-create/',RoleMasterCreateView.as_view()),
     path('approval/',ManagerApprovalView.as_view()),
     path('switch_role/',switch_role,name='switch_role'),
+    path('search/',SerachView.as_view())
 ]
