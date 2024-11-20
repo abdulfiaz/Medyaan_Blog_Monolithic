@@ -6,7 +6,6 @@ from users.models import CustomUser
 class TemplateMaster(BaseModel):
     template_name = models.CharField(max_length=100,blank=True,null=True)
     content = models.TextField(blank=True,null=True)
-    iu_id = models.ForeignKey(IUMaster, related_name='templatemaster_iu_id', on_delete=models.DO_NOTHING)
 
     class Meta:
         db_table = 'template_master'

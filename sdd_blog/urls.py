@@ -21,6 +21,7 @@ urlpatterns = [
     path('admin/api/',include('adminapp.urls',namespace= 'adminapp')),
     path('users/api/', include('users.urls', namespace='users')),
     path('posts/api/', include('posts.urls', namespace='posts')),
-    path('events/api/',include('events.urls',namespace='events'))
+    path('events/api/',include('events.urls',namespace='events')),
+    path('notification/api/',include('notification.urls',namespace='notification'))
 
 ]
