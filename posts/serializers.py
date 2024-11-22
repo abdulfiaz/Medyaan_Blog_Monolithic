@@ -31,13 +31,16 @@ class GetPostDetailsSerializer(serializers.ModelSerializer):
 
     def get_user_profile(self, obj):
         profile = obj.publisher.userdetails.first()
-
+        role = self.context.get('role')
+        if role in ['publisher','consumer']:
+            return "Not applicable"
         if profile:
             return {'id': profile.id,'firstname': profile.firstname,'lastname': profile.lastname,'mobile_number':profile.user.mobile_number,'email':profile.user.email}
         return None
     
     def get_likes_count(self,obj):
         likes=obj.likes_users_list.count()
+     
         if likes:
             return likes
         return 0
@@ -45,6 +48,9 @@ class GetPostDetailsSerializer(serializers.ModelSerializer):
     def get_is_liked(self, obj):
         # Access the current user from the context
         user = self.context.get('request').user
+        role = self.context.get('role')
+        if role in ['publisher']:
+            return "N/A"
         if user.is_authenticated:
             return obj.likes_users_list.filter(id=user.id).exists()
         return False

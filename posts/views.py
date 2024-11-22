@@ -148,28 +148,37 @@ class PostCategoryView(APIView):
 class PostDetailsView(APIView):
     def get(self, request):
         try:
-            start_count = int(request.query_params.get('startcount',0))
-            end_count = int(request.query_params.get('endcount'))
-            category_id = request.query_params.get('category_id', None)
-            publisher_user_id = request.query_params.get('publisher', None)
+            user_role = get_user_roles(request)
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
 
             if not iu_obj:
                 return Response({"status": "error", "message": "UNAUTHORIZED DOMAIN"}, status=status.HTTP_404_NOT_FOUND)
 
-            if publisher_user_id:
-                publisher_detail = CustomUser.objects.get(id=publisher_user_id, is_active=True, iu_id=iu_obj)
-                publish_user = PublisherProfile.objects.get(user=publisher_detail, is_active=True, iu_id=iu_obj,approved_status='approved', role_type='publisher')
-                post = PostDetails.objects.filter(publisher=publish_user.user, iu_id=iu_obj, is_active=True,is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
-            elif category_id:
-                post = PostDetails.objects.filter(category_id=category_id, iu_id=iu_obj, is_active=True,is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
-            else:
-                post = PostDetails.objects.filter(iu_id=iu_obj, is_active=True, is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
+            if user_role == 'publisher':
+                post = PostDetails.objects.filter(publisher=request.user, iu_id=iu_obj, is_active=True,is_archived=False, post_status='published').order_by('-created_at')
+                serializer = GetPostDetailsSerializer(post, many=True,context={'request': request,'role' : user_role})
+                return Response({"status":"success","total_post_counts":post.count(),"data":serializer.data},status=status.HTTP_200_OK)
 
-            serializer = GetPostDetailsSerializer(post, many=True,context={'request': request})
+            elif user_role == 'consumer':
+                st_count=request.query_params.get('startcount',0)
+                ed_count=request.query_params.get('endcount',10)
+                start_count = int(st_count)
+                end_count = int(ed_count)
+                category_id = request.query_params.get('category_id', None)
+                publisher_user_id = request.query_params.get('publisher', None)
+                if publisher_user_id:
+                    publisher_detail = CustomUser.objects.get(id=publisher_user_id, is_active=True, iu_id=iu_obj)
+                    publish_user = PublisherProfile.objects.get(user=publisher_detail, is_active=True, iu_id=iu_obj,approved_status='approved', role_type='publisher')
+                    post = PostDetails.objects.filter(publisher=publish_user.user, iu_id=iu_obj, is_active=True,is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
+                elif category_id:
+                    post = PostDetails.objects.filter(category_id=category_id, iu_id=iu_obj, is_active=True,is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
+                else:
+                    post = PostDetails.objects.filter(iu_id=iu_obj, is_active=True, is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
 
-            return Response({"status":"success","message":"data retrieved successfully","data": serializer.data}, status=status.HTTP_200_OK)
+                serializer = GetPostDetailsSerializer(post, many=True,context={'request': request,'role':user_role})
+
+                return Response({"status":"success","message":"data retrieved successfully","data": serializer.data}, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -440,12 +449,17 @@ class LikeAPI(APIView):
     def get(self,request):
         try:
             
+            user_role = get_user_roles(request)
+            if user_role != 'publisher':
+                return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
+
             post_id=request.query_params.get('post_id',None)
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
-            post=PostDetails.objects.get(pk=post_id,is_active=True,iu_id=iu_obj,is_archived=False,post_status='published')
+            post=PostDetails.objects.get(pk=post_id,is_active=True,iu_id=iu_obj,is_archived=False,post_status='published',publisher=request.user)
             req_det=GetCustomUserSerializer(post.likes_users_list.all(),many=True)
-            return Response({"status":"success","message":req_det.data},status=status.HTTP_200_OK)
+            total_count=post.likes_users_list.count()
+            return Response({"status":"success","total_like_count":total_count,"message":req_det.data},status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
     
@@ -478,7 +492,9 @@ class LikeAPI(APIView):
 class ShareAPi(APIView):
     def get(self,request):
         try:
-            
+            user_role = get_user_roles(request)
+            if user_role != 'publisher':
+                return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
             post_id=request.query_params.get('post_id',None)
             if post_id is None:
               return Response({"status":"error","message":"post_id is required"},status=status.HTTP_400_BAD_REQUEST)

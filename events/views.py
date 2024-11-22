@@ -14,40 +14,56 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from notification.models import TemplateMaster,EventMaster
 from adminapp.utils import get_notification
-import base64
-import os
 from sdd_blog import settings
-
-# def convert_image_to_base64(image_path):
-#     with open(image_path, 'rb') as img_file:
-#         base64_string = base64.b64encode(img_file.read()).decode('utf-8')
-#     return f"data:image/png;base64,{base64_string}"
 
 
 class EventDetailsView(APIView): 
     def get(self,request):
-        event_date = request.query_params.get('date')
-        event_organizer = request.query_params.get('event_organizer')
+        user_role = get_user_roles(request)
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        iu_obj = get_iuobj(domain)
+        if not iu_obj :
+            return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
 
-        if event_date:
-            try:
-                date_obj = datetime.strptime(event_date, '%Y-%m-%d').date()
-            except ValueError:
-                return Response({"status": "error", "message": "Invalid date format. Use YYYY-MM-DD."},status=status.HTTP_400_BAD_REQUEST)
+        if user_role == 'eventorganiser':
+            events = EventDetails.objects.filter(event_organizer=request.user.id,iu_id=iu_obj,is_active=True,event_status='published').order_by('-created_at')
+            serializer=GetEventDetailsSerializer(events,many=True)
+            cur_date=datetime.now()
+            
+            completed = events.filter(event_date__lt=cur_date).count()
+            upcoming = events.filter(event_date__gte=cur_date).count()
+            return Response({"status":"success","Total events count":events.count(),"completed_events":completed,"upcoming_events":upcoming,"data":serializer.data},status=status.HTTP_200_OK)
+        
+        
 
-            events = EventDetails.objects.filter(event_date__date=date_obj,is_active=True).order_by('-created_at')
-        elif event_organizer:
-            events = EventDetails.objects.filter(event_organizer=event_organizer,is_active=True).order_by('-created_at')
-        else:
-            events = EventDetails.objects.filter(event_date__gt=timezone.now(),is_active=True).order_by('-created_at')
+        elif user_role == 'consumer':
+            event_date = request.query_params.get('date')
+            event_organizer = request.query_params.get('event_organizer')
+            address=request.query_params.get('search_address')
 
-        event_list = []
-        for event in events:
-            event_data = GetEventDetailsSerializer(event).data
-            event_data['event_detailed_status'] = 'upcoming' if event.event_date > timezone.now() else 'completed'
-            event_list.append(event_data)
+            if event_date:
+                try:
+                    date_obj = datetime.strptime(event_date, '%Y-%m-%d').date()
+                except ValueError:
+                    return Response({"status": "error", "message": "Invalid date format. Use YYYY-MM-DD."},status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"status": "success", "message": "Events retrieved successfully", "data": event_list},status=status.HTTP_200_OK)
+                events = EventDetails.objects.filter(event_date__date=date_obj,is_active=True,iu_id=iu_obj,event_status='published').order_by('-created_at')
+            elif event_organizer:
+                events = EventDetails.objects.filter(event_organizer=event_organizer,is_active=True,iu_id=iu_obj).order_by('-created_at')
+            
+            elif address:
+                events = EventDetails.objects.filter(address__icontains=address,is_active=True,iu_id=iu_obj).order_by('-created_at')
+
+            else:
+                events = EventDetails.objects.filter(event_date__gt=timezone.now(),is_active=True,iu_id=iu_obj).order_by('-created_at')
+
+            event_list = []
+            for event in events:
+                event_data = GetEventDetailsSerializer(event).data
+                event_data['event_detailed_status'] = 'upcoming' if event.event_date > timezone.now() else 'completed'
+                event_list.append(event_data)
+
+            return Response({"status": "success", "message": "Events retrieved successfully", "data": event_list},status=status.HTTP_200_OK)
 
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
