@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from posts.models import *
 from users.serializers import *
+from rest_framework.permissions import IsAuthenticated
+
 
 class PostCategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -46,6 +48,7 @@ class GetPostDetailsSerializer(serializers.ModelSerializer):
         if user.is_authenticated:
             return obj.likes_users_list.filter(id=user.id).exists()
         return False
+
     def get_comments_count(self,obj):
         comments_detail=Comments.objects.filter(post=obj,iu_id=obj.iu_id,is_active=True,is_removed_comment=False)
         return comments_detail.count()

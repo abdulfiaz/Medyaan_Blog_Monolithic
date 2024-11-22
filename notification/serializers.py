@@ -21,3 +21,7 @@ class GetEventMasterSerializer(serializers.ModelSerializer):
         model = EventMaster
         fields = ['id','template_id','name','email','sms','web','role']
     
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=Notification
+        fields='__all__'

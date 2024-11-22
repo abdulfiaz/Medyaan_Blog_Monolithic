@@ -1,22 +1,22 @@
+
 from django.forms import model_to_dict
-from django.shortcuts import render
 from django.contrib.auth.hashers import make_password,check_password
 from rest_framework.decorators import api_view,permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny
 from rest_framework_jwt.serializers import jwt_payload_handler, jwt_encode_handler
-from django.db import transaction, IntegrityError
+from django.db import transaction
 from users.models import *
 from rest_framework.response import Response
 from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework import status
-from django.db.models import QuerySet
 from django.conf import settings    
-from users.serializers import CustomUserSerializer, UserPersonalProfileSerializer,GetCustomUserSerializer,PublisherProfileSerializer,GetPublisherProfileSerializer,ApprovedProfileSerializer
+from users.serializers import *
 from adminapp.iudetail import get_iuobj
 from users.auth import get_user_roles,upload_image_s3
-import json
-from django.db.models import Q
+from django.template.loader import render_to_string
+from notification.models import TemplateMaster,EventMaster
+from adminapp.utils import get_notification
 
 
 @api_view(['POST'])
@@ -146,7 +146,7 @@ class CreateCustomUserView(APIView):
     def post(self, request):
         role_name = request.data.get('role_type', 'consumer')
         user_role = get_user_roles(request)
-
+        print(user_role)
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
 
         iu_obj = get_iuobj(domain)
@@ -184,6 +184,7 @@ class CreateCustomUserView(APIView):
         
         elif user_role != 'admin' and role_name == 'manager':
             return Response({"status":"error","message":"only admin can create manager and eventorganiser !"},status=status.HTTP_401_UNAUTHORIZED)
+        
         transaction.set_autocommit(False)
         data=request.data
         data['iu_id']=iu_obj.id
@@ -377,24 +378,61 @@ class ManagerApprovalView(APIView):
         data['modified_by']=request.user.id
         if data['approved_status']== 'rejected':
             data['is_rejected']=True
-
+        
         serializer=PublisherProfileSerializer(user,data=data,partial=True)
         
         if not serializer.is_valid():
             transaction.rollback()
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
         serializer.save()
         
         user_data=model_to_dict(user)
+        
         approved_status=request.data.get("approved_status")
+        
         if approved_status =="approved":
             approved_profiles=ApprovedProfileSerializer(data=user_data)
             if not approved_profiles.is_valid():
                 transaction.rollback()
                 return Response(approved_profiles.errors, status=status.HTTP_400_BAD_REQUEST)
             approved_profiles.save()
+       
+        # template and email sending
+        try:
+            template=TemplateMaster.objects.get(template_name='manager_approve/reject_user')
+        except Exception as e:
+            return Response({"status":"error","message":"template does not exist"},status=status.HTTP_400_BAD_REQUEST)
+        
+        event=EventMaster.objects.get(name=template.template_name,iu_id=iu_obj,is_active=True)
+        
+        # template_message=template.content.format(user.id,request.user.id)
+        message=f"your application for {user.role_type}"
+        content={
+            "approved_status":approved_status,
+            "role":user.role_type,
+            "message":message,
+            "application_id":user.id,
+            "manager_id":request.user.id
+        }
+                   
+        rendered_html_message = render_to_string('profile_approving.html',content)
+        
+        sender_id=request.user.id
+        receiver_id=user.user.id
+        subject="Status of your application"
+        
+        email_id=user.user.email
+        email_message=rendered_html_message
+        role=event.role
+        iu_id=iu_obj.id
+        
+        notification_data=get_notification(message,event,sender_id,receiver_id,subject,email_id,email_message,role,iu_id)
+        if notification_data != 1:
+            transaction.rollback()
+            print(notification_data)
         transaction.commit()
-        return Response({"status":"success","message":"User details updated successfully"})
+        return Response({"status":"success","message":"User details updated successfully"},status=status.HTTP_200_OK)
     
 # admin search users 
 class SerachView(APIView):

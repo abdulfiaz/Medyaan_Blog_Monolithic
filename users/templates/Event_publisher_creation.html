@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approval Submission</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f7f7f7;
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            background-color: #fff;
+            margin: 30px auto;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+        }
+        .content {
+            padding: 20px;
+            flex: 1;
+            text-align: left;
+        }
+        .image-container {
+            flex: 1;
+            border-left: 1px solid #ddd;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 0 10px 10px 0;
+            border-color: #333;
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #4caf50;
+        }
+        p, ul {
+            margin: 0;
+            margin-bottom: 15px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        ul li {
+            font-weight: bold;
+        }
+        .container p:last-child {
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            <h2>New Profile Submission</h2>
+            <p>Dear {{role}},</p>
+            <p>New Profile Registered and pending for approval. {{message}} </p>
+            <ul>
+                <li> user : {{user_profile}} 
+                    <br>
+                    Application_id : {{application_id}}
+                </li>
+            </ul>
+            <p>Thank you.</p>
+        </div>
+        <div class="image-container">
+            <img src="cid:welcome.jpg" alt="Profile Status Image">
+        </div>
+    </div>
+</body>
+</html>

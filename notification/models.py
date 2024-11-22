@@ -1,6 +1,11 @@
+
 from django.db import models
 from adminapp .models import BaseModel,IUMaster
 from users.models import CustomUser
+from django.core.mail import EmailMessage
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 
 
 class TemplateMaster(BaseModel):
@@ -41,3 +46,23 @@ class Notification(BaseModel):
     class Meta:
         db_table = 'notification'
         ordering = ['created_at']
+
+@receiver(post_save, sender=Notification)
+def send_notification_in_email(instance,**kwargs):
+    if instance.event.email:
+        sender_email = instance.sender.email
+        receiver_email = instance.receiver.email
+        email_content=instance.email_message
+
+        if not sender_email or not receiver_email:
+            return None
+        
+        subject = instance.subject
+        email = EmailMessage(
+            subject=subject,
+            body=email_content,
+            from_email=sender_email,
+            to=[receiver_email]
+        )
+        email.content_subtype = "html"
+        email.send(fail_silently=False)

@@ -10,8 +10,11 @@ from adminapp.iudetail import get_iuobj
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.parsers import MultiPartParser, FormParser
-import json
 from rest_framework.decorators import api_view, parser_classes
+from django.template.loader import render_to_string
+from notification.models import TemplateMaster,EventMaster
+from adminapp.utils import get_notification
+
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
@@ -164,7 +167,7 @@ class PostDetailsView(APIView):
             else:
                 post = PostDetails.objects.filter(iu_id=iu_obj, is_active=True, is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
 
-            serializer = GetPostDetailsSerializer(post, many=True, context={'request': request})
+            serializer = GetPostDetailsSerializer(post, many=True,context={'request': request}, context={'request': request})
 
             return Response({"status":"success","message":"data retrieved successfully","data": serializer.data}, status=status.HTTP_200_OK)
 
@@ -317,7 +320,43 @@ class PostApprovalView(APIView):
             return Response({"status":"error","message":serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         
         serializer.save()
-        transaction.commit()
+
+
+
+        # template and email sending
+        try:
+            template=TemplateMaster.objects.get(template_name='post_approve/reject')
+        except Exception as e:
+            return Response({"status":"error","message":"template does not exist"},status=status.HTTP_400_BAD_REQUEST)
+        
+        event=EventMaster.objects.get(name=template.template_name,iu_id=iu_obj,is_active=True)
+        
+        template_message=template.content.format(post_obj.title,post_obj.post_status)
+        print(template_message)
+        message=f"Your Post Approval"
+        content={
+            
+            "message":message,
+            "template_message":template_message
+            
+        }
+        rendered_html_message = render_to_string('post_approval.html',content)
+        sender_id=request.user.id
+        receiver_id=post_obj.publisher.id
+        subject="Status of your application"
+        
+        email_id=post_obj.publisher.email
+        email_message=rendered_html_message
+        role=event.role
+        iu_id=iu_obj.id
+        
+        notification_data=get_notification(message,event,sender_id,receiver_id,subject,email_id,email_message,role,iu_id)
+        if notification_data != 1:
+            transaction.rollback()
+            print(notification_data)
+
+
+        # transaction.commit()
         return Response({"status":"success","message":"User details updated successfully"})
 
 class CommentsView(APIView):

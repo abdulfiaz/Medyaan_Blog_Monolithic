@@ -10,6 +10,20 @@ from users.auth import get_user_roles
 from django.conf import settings
 from adminapp.iudetail import get_iuobj    
 from django.db import transaction
+from django.template.loader import render_to_string
+from notification.models import TemplateMaster,EventMaster
+from adminapp.utils import get_notification
+
+
+import base64
+import os
+from sdd_blog import settings
+
+# def convert_image_to_base64(image_path):
+#     with open(image_path, 'rb') as img_file:
+#         base64_string = base64.b64encode(img_file.read()).decode('utf-8')
+#     return f"data:image/png;base64,{base64_string}"
+
 
 class EventDetailsView(APIView): 
     def get(self,request):
@@ -190,6 +204,48 @@ class EventApproval(APIView):
             return Response({"status":"error","message":serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         
         serializer.save()
+
+         # template and email sending
+        try:
+            template=TemplateMaster.objects.get(template_name='event_approve/reject')
+        except Exception as e:
+            return Response({"status":"error","message":"template does not exist"},status=status.HTTP_400_BAD_REQUEST)
+        
+        event=EventMaster.objects.get(name=template.template_name,iu_id=iu_obj,is_active=True)
+        event_approved_status=request.data.get('event_status')
+        template_message=template.content.format(event_obj.name,event_approved_status)
+        print(template_message)
+        message="Your Event Approval"
+    
+        domain = request.get_host()  # Example: '127.0.0.1:8000'
+        logo_url = f"http://{domain}/static/images/welcome.jpg"
+        print(logo_url)
+        
+
+        content={
+            "base64_image":logo_url,
+            "message":message,
+            "template_message":template_message
+            
+        }
+        rendered_html_message = render_to_string('events/event_approval.html',content)
+        sender_id=request.user.id
+        receiver_id=event_obj.event_organizer.id
+        subject="Status of your application"
+        
+        email_id=event_obj.event_organizer.email
+        email_message=rendered_html_message
+        role=event.role
+        iu_id=iu_obj.id
+        
+        notification_data=get_notification(message,event,sender_id,receiver_id,subject,email_id,email_message,role,iu_id)
+        if notification_data != 1:
+            transaction.rollback()
+            print(notification_data)
+
+
+        # transaction.commit()
+        return Response({"status":"success","message":"User details updated successfully"})
         transaction.commit()
         return Response({"status":"success","message":"Event details updated successfully"})
 
