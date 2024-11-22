@@ -141,29 +141,35 @@ class PostCategoryView(APIView):
         except Exception as e:
             return Response({"status":"error","message":str(e)},status=status.HTTP_403_FORBIDDEN)
 
+
 class PostDetailsView(APIView):
-    def get(self,request):
+    def get(self, request):
         try:
-            category_id=request.query_params.get('category_id',None)
-            publisher_user_id=request.query_params.get('publisher',None)
+            start_count = int(request.query_params.get('startcount',0))
+            end_count = int(request.query_params.get('endcount'))
+            category_id = request.query_params.get('category_id', None)
+            publisher_user_id = request.query_params.get('publisher', None)
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
-            if not iu_obj :
-                return Response({"status":"error","message":"UNAUTHORIZED DOMAIN"},status=status.HTTP_404_NOT_FOUND)
-           
-            if publisher_user_id:
-                publisher_detail=CustomUser.objects.get(id=publisher_user_id,is_active=True,iu_id=iu_obj)
-                publish_user=PublisherProfile.objects.get(user=publisher_detail,is_active=True,iu_id=iu_obj,approved_status='approved',role_type='publisher')
-                post=PostDetails.objects.filter(publisher=publish_user.user,iu_id=iu_obj,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
-            elif category_id:
-                post=PostDetails.objects.filter(category_id=category_id,iu_id=iu_obj,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
-            else:
-                post=PostDetails.objects.filter(iu_id=iu_obj,is_active=True,is_archived=False,post_status='published').order_by('-created_at')
 
-            serializer=GetPostDetailsSerializer(post,many=True)
-            return Response({"status":"success","message":"Post Details","data":serializer.data},status=status.HTTP_200_OK)
+            if not iu_obj:
+                return Response({"status": "error", "message": "UNAUTHORIZED DOMAIN"}, status=status.HTTP_404_NOT_FOUND)
+
+            if publisher_user_id:
+                publisher_detail = CustomUser.objects.get(id=publisher_user_id, is_active=True, iu_id=iu_obj)
+                publish_user = PublisherProfile.objects.get(user=publisher_detail, is_active=True, iu_id=iu_obj,approved_status='approved', role_type='publisher')
+                post = PostDetails.objects.filter(publisher=publish_user.user, iu_id=iu_obj, is_active=True,is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
+            elif category_id:
+                post = PostDetails.objects.filter(category_id=category_id, iu_id=iu_obj, is_active=True,is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
+            else:
+                post = PostDetails.objects.filter(iu_id=iu_obj, is_active=True, is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
+
+            serializer = GetPostDetailsSerializer(post, many=True, context={'request': request})
+
+            return Response({"status":"success","message":"data retrieved successfully","data": serializer.data}, status=status.HTTP_200_OK)
+
         except Exception as e:
-            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)

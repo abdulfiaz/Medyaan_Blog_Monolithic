@@ -396,7 +396,7 @@ class ManagerApprovalView(APIView):
         transaction.commit()
         return Response({"status":"success","message":"User details updated successfully"})
     
-
+# admin search users 
 class SerachView(APIView):
     def get(self,request):
         email = request.query_params.get('email')

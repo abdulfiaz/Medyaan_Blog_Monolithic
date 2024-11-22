@@ -11,7 +11,7 @@ from django.conf import settings
 from adminapp.iudetail import get_iuobj    
 from django.db import transaction
 
-class EventDetailsView(APIView):
+class EventDetailsView(APIView): 
     def get(self,request):
         event_date = request.query_params.get('date')
         event_organizer = request.query_params.get('event_organizer')
@@ -75,6 +75,10 @@ class EventDetailsView(APIView):
         if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
         
+        user_role = get_user_roles(request)
+        if user_role != 'eventorganiser':
+            return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+        
         if not event_id:
             return Response({"status":"error","message":"event_id is required"},status=status.HTTP_400_BAD_REQUEST)
         
@@ -107,6 +111,11 @@ class EventDetailsView(APIView):
                 return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)        
 
             user_role = get_user_roles(request)
+
+            event_booking_obj = EventBookingDetails.objects.filter(event=event_id, is_active=True, iu_id=iu_obj)
+            if event_booking_obj:
+                return Response({"status": "error", "message": "This event is unable to delete as it has bookings!"}, status=status.HTTP_400_BAD_REQUEST)
+
             try:
                 if user_role == 'manager':
                     event_obj = EventDetails.objects.get(id=event_id,event_status='published',is_active=True,iu_id=iu_obj)
