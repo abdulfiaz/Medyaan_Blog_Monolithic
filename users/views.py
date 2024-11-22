@@ -1,4 +1,3 @@
-
 from django.forms import model_to_dict
 from django.contrib.auth.hashers import make_password,check_password
 from rest_framework.decorators import api_view,permission_classes
@@ -17,6 +16,9 @@ from users.auth import get_user_roles,upload_image_s3
 from django.template.loader import render_to_string
 from notification.models import TemplateMaster,EventMaster
 from adminapp.utils import get_notification
+from django.core.mail import send_mail 
+import random 
+from sdd_blog.settings import EMAIL_HOST_USER
 
 
 @api_view(['POST'])
@@ -469,6 +471,107 @@ class SerachView(APIView):
 
         serializer = GetCustomUserSerializer(user_obj,many=True)    
         return Response({"status": "success","message":"Data retrived successfully","data": serializer.data}, status=status.HTTP_200_OK)
+
+# change password
+class ChangePasswordView(APIView):
+    def put(self,request):
+        try:
+            old_password=request.data.get('old_password')
+            new_password=request.data.get('new_password')
+            confirm_password=request.data.get('confirm_password')
+
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_obj = get_iuobj(domain)
+            if not iu_obj:
+                return Response({'status': 'error', 'message': 'Unauthorized domain'},status=status.HTTP_401_UNAUTHORIZED)
+            
+            try:
+                user_obj=CustomUser.objects.get(id=request.user.id,is_active=True,iu_id=iu_obj)
+            except CustomUser.DoesNotExist:
+                return Response({"status":"error","message":"user not exists"},status=status.HTTP_404_NOT_FOUND)
+
+            if not check_password(old_password,user_obj.password):
+                return Response({"status":"error","message":"Old password doesnt match!"},status=status.HTTP_400_BAD_REQUEST)
+            
+            if new_password != confirm_password:
+                return Response({"status":"error","message":"Password doesnt match!"},status=status.HTTP_400_BAD_REQUEST)
+            
+            user_obj.password=make_password(new_password)
+            user_obj.temp_code=None
+            user_obj.modified_by=request.user.id
+            user_obj.save()
+            return Response({"status":"success","message":"Password changed successfull"},status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+            
+# forgot password
+class ForgotPasswordView(APIView):
+    def post(self,request):
+        try:
+            email=request.data.get('email')
+            
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_obj = get_iuobj(domain)
+            if not iu_obj:
+                return Response({'status': 'error', 'message': 'Unauthorized domain'},status=status.HTTP_401_UNAUTHORIZED)
+            
+            try:
+                user_obj=CustomUser.objects.get(email=email,is_active=True,iu_id=iu_obj)
+            except CustomUser.DoesNotExist:
+                return Response({"status":"error","message":"user not exists"},status=status.HTTP_404_NOT_FOUND)
+            
+            otp=str(random.randint(100000,999999))
+            user_obj.temp_code=otp
+            subject="Forgot poassword otp"
+            body=f"Your otp is {otp}. This is valid upto 10 mins!"
+            
+            send_mail(subject,body,EMAIL_HOST_USER,[email])
+            user_obj.save()
+            return Response({"status":"sucess","message":"otp sent sucessfully"},status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+        
+    def put(self,request):
+        try:
+            email=request.data.get('email')
+            new_password=request.data.get('new_password')
+            confirm_password=request.data.get('confirm_password')
+            otp=request.data.get('otp')
+
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_obj = get_iuobj(domain)
+            if not iu_obj:
+                return Response({'status': 'error', 'message': 'Unauthorized domain'},status=status.HTTP_401_UNAUTHORIZED)
+            
+            try:
+                user_obj=CustomUser.objects.get(email=email,is_active=True,iu_id=iu_obj)
+            except CustomUser.DoesNotExist:
+                return Response({"status":"error","message":"user not exists"},status=status.HTTP_404_NOT_FOUND)
+            
+            if user_obj.temp_code != otp:
+                return Response({"status":"error","message":"OTP is wrong!"},status=status.HTTP_400_BAD_REQUEST)
+            
+            if new_password != confirm_password:
+                return Response({"status":"error","message":"Password doesnt match!"},status=status.HTTP_400_BAD_REQUEST)
+            
+            subject="Password changed!"
+            body=f"Your new password has been updated successfuly!"
+
+            user_obj.password=make_password(new_password)
+            user_obj.temp_code=None
+            send_mail(subject,body,EMAIL_HOST_USER,[email])
+            user_obj.save()
+            return Response({"status":"success","message":"Password updated successfully"},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+        
 
 
 

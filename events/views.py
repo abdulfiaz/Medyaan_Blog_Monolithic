@@ -1,5 +1,6 @@
 from django.shortcuts import render
-from datetime import datetime
+from datetime import datetime,timedelta
+from django.utils.dateformat import format as date_format
 from django.utils import timezone
 from rest_framework.views import APIView,status
 from rest_framework.response import Response
@@ -13,8 +14,6 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from notification.models import TemplateMaster,EventMaster
 from adminapp.utils import get_notification
-
-
 import base64
 import os
 from sdd_blog import settings
@@ -358,6 +357,6 @@ class EventBookingDetailsView(APIView):
         event_detail.save()
         transaction.commit()
         return Response({"status":"success","message":"tickets cancelled successfully"},status=status.HTTP_200_OK)
-        
+
 
 
