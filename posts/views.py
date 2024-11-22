@@ -167,7 +167,7 @@ class PostDetailsView(APIView):
             else:
                 post = PostDetails.objects.filter(iu_id=iu_obj, is_active=True, is_archived=False, post_status='published').order_by('-created_at')[start_count:end_count+1]
 
-            serializer = GetPostDetailsSerializer(post, many=True,context={'request': request}, context={'request': request})
+            serializer = GetPostDetailsSerializer(post, many=True,context={'request': request})
 
             return Response({"status":"success","message":"data retrieved successfully","data": serializer.data}, status=status.HTTP_200_OK)
 
