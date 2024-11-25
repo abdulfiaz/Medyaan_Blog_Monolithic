@@ -279,19 +279,20 @@ class EventBookingDetailsView(APIView):
             if not event_id:
                 return Response({"status": "error", "message": "event_id is required for event organizers"}, status=status.HTTP_400_BAD_REQUEST)
             try:
-                event_obj = EventDetails.objects.get(id=event_id, is_active=True, iu_id=iu_obj)
+                event_obj = EventDetails.objects.get(id=event_id, is_active=True, iu_id=iu_obj,event_organizer=request.user)
                 bookings = EventBookingDetails.objects.filter(event=event_obj, is_active=True,iu_id=iu_obj)
             except EventDetails.DoesNotExist:
-                return Response({"status": "error", "message": "Event not found"}, status=status.HTTP_404_NOT_FOUND)
-        
+                return Response({"status": "error", "message": "Event not found"}, status=status.HTTP_404_NOT_FOUND)  
         elif user_roles == 'consumer':
             bookings = EventBookingDetails.objects.filter(user=request.user, is_active=True,iu_id=iu_obj)
         
         else:
             return Response({"status": "error", "message": "Unauthorized role"}, status=status.HTTP_403_FORBIDDEN)
 
+        completed_events=bookings.filter(booking_date__lt=timezone.now()).count()
+        upcoming_events=bookings.filter(booking_date__gte=timezone.now()).count()
         serializer = GetEventBookingDetailsSerializer(bookings, many=True)
-        return Response({"status": "success", "data": serializer.data}, status=status.HTTP_200_OK)
+        return Response({"status": "success","completed_event":completed_events,"upcoming_events":upcoming_events, "data": serializer.data}, status=status.HTTP_200_OK)
 
     def post(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)

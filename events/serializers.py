@@ -35,11 +35,18 @@ class GetEventBookingDetailsSerializer(serializers.ModelSerializer):
     event_longitude = serializers.CharField(source='event.longitude', default=None)
     event_latitude = serializers.CharField(source='event.latitude', default=None)
     event_address = serializers.CharField(source='event.address', default=None)
-
+    count_down=serializers.SerializerMethodField()
     class Meta:
         model = EventBookingDetails
-        fields = ['id', 'no_of_tickets', 'booking_status', 'payment_status','event_detail_status', 'total_ticket_price', 'booking_date','event_name','event_amount','event_longitude','event_latitude','event_address','user_profile','event_organizer']
+        fields = ['id', 'no_of_tickets', 'booking_status', 'payment_status','event_detail_status', 'total_ticket_price', 'booking_date','event_name','event_amount','event_longitude','event_latitude','event_address','count_down','user_profile','event_organizer']
 
+    def get_count_down(self,obj):
+        cur_date = timezone.now()
+        event_date=obj.event.event_date
+        count=event_date-cur_date
+        if count.days<1:
+            return 0
+        return count.days
     
     def get_user_profile(self, obj):
         profile = obj.user.userdetails.first()
