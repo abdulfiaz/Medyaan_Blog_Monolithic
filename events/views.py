@@ -376,7 +376,7 @@ class EventBookingDetailsView(APIView):
         transaction.commit()
         return Response({"status":"success","message":"tickets cancelled successfully"},status=status.HTTP_200_OK)
 
-
+# bookmark for the events
 class BookmarkView(APIView):
     def get(self,request):
         try:
