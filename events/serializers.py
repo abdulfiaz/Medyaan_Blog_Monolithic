@@ -78,7 +78,3 @@ class GetEventBookingDetailsSerializer(serializers.ModelSerializer):
             }
         return None
 
-
-
-
-

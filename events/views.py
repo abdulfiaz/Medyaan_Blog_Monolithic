@@ -4,8 +4,9 @@ from django.utils.dateformat import format as date_format
 from django.utils import timezone
 from rest_framework.views import APIView,status
 from rest_framework.response import Response
-from events.serializers import EventDetailsSerializer,GetEventDetailsSerializer,EventBookingDetailsSerializer,GetEventBookingDetailsSerializer
-from events.models import EventDetails,EventBookingDetails
+from events.serializers import *
+from events.models import *
+from posts.serializers import *
 from users.models import PublisherProfile
 from users.auth import get_user_roles
 from django.conf import settings
@@ -339,10 +340,10 @@ class EventBookingDetailsView(APIView):
 
     def put(self,request):
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
-        iu_master = get_iuobj(domain)
+        iu_obj = get_iuobj(domain)
         transaction.set_autocommit(False)
        
-        if not iu_master :
+        if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
        
         event_registration_id=request.data.get("event_registration_id")
@@ -352,7 +353,7 @@ class EventBookingDetailsView(APIView):
             return Response({"status":"error","message":"event id is required"},status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            event_registered_detail=EventBookingDetails.objects.get(id=event_registration_id,iu_id=iu_master,is_active=True,is_archived=False,user=request.user)
+            event_registered_detail=EventBookingDetails.objects.get(id=event_registration_id,iu_id=iu_obj,is_active=True,is_archived=False,user=request.user)
        
         except EventBookingDetails.DoesNotExist:
             transaction.rollback()
@@ -366,7 +367,7 @@ class EventBookingDetailsView(APIView):
         event_registered_detail.save()
         
         try:
-            event_detail=EventDetails.objects.get(id=event_registered_detail.event.id,is_active=True,iu_id=iu_master,is_archived=False)
+            event_detail=EventDetails.objects.get(id=event_registered_detail.event.id,is_active=True,iu_id=iu_obj,is_archived=False)
         except EventDetails.DoesNotExist:
             transaction.rollback()
             return Response({"status":"error","message":"event does not found"},status=status.HTTP_400_BAD_REQUEST)
@@ -376,4 +377,57 @@ class EventBookingDetailsView(APIView):
         return Response({"status":"success","message":"tickets cancelled successfully"},status=status.HTTP_200_OK)
 
 
+class BookmarkView(APIView):
+    def get(self,request):
+        try:
+            event_id = request.query_params.get('event_id')
+            
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_obj = get_iuobj(domain)
 
+            user_role = get_user_roles(request)
+            if user_role != 'eventorganiser':
+                return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+            if not iu_obj:
+                return Response({"status": "error", "message": "Unauthorized domain"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            try:
+                event_obj = EventDetails.objects.get(id=event_id,is_active=True,event_status='published',iu_id=iu_obj,event_organizer=request.user)
+            except EventDetails.DoesNotExist:
+                return Response({"status":"error","message":"Event Details doesnt exists!"},status=status.HTTP_404_NOT_FOUND)
+            user_obj=GetCustomUserSerializer(event_obj.bookmark.all(),many=True)
+            total_count=event_obj.bookmark.count()
+
+            return Response({"status":"success","message":user_obj.data,"total_count":total_count})
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+
+
+    def put(self,request):
+        try:
+            event_id = request.data.get('event_id')
+            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            iu_obj = get_iuobj(domain)
+            user_role=get_user_roles(request)
+
+            if not iu_obj :
+                return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
+            
+            if user_role != 'consumer':
+                return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+            
+            event_obj = EventDetails.objects.get(id=event_id,is_active=True,iu_id=iu_obj,is_archived=False,event_status='published')
+            bookmark_obj=event_obj.bookmark.filter(id=request.user.id).count()
+
+            if bookmark_obj>0:
+                event_obj.bookmark.remove(request.user)
+                return Response({"status":"success","message":"Bookmark removed successfully!"},status=status.HTTP_200_OK)
+            
+            event_obj.bookmark.add(request.user)
+            return Response({"status":"success","message":"Bookmark added successfully!"},status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
+            
+            

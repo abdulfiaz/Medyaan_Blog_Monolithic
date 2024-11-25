@@ -448,7 +448,7 @@ class CommentsView(APIView):
 class LikeAPI(APIView):
     def get(self,request):
         try:
-            
+
             user_role = get_user_roles(request)
             if user_role != 'publisher':
                 return Response({"status":"error","message":"You are unauthorized to do this action !"},status=status.HTTP_401_UNAUTHORIZED)
@@ -478,14 +478,14 @@ class LikeAPI(APIView):
             iu_obj = get_iuobj(domain)
             Post_detail=PostDetails.objects.get(id=post_id,is_active=True,iu_id=iu_obj,post_status='published',is_archived=False)
             user_like=Post_detail.likes_users_list.filter(id=user.id).count()
-            
+              
             if user_like>0:
                 Post_detail.likes_users_list.remove(user)
                 return Response({"status":"success","message":"like removed successfully"},status=status.HTTP_200_OK)
             
             Post_detail.likes_users_list.add(user)
             
-            return Response({"status":"success","message":"like addeds successfully"},status=status.HTTP_200_OK)
+            return Response({"status":"success","message":"like added successfully"},status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
         
