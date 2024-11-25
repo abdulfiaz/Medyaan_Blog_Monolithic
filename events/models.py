@@ -17,6 +17,7 @@ class EventDetails(BaseModel):
     latitude = models.CharField(max_length=20, null=True, blank=True)
     address = models.TextField()
     event_status = models.CharField(default='pending',max_length=50)
+    bookmark = models.ManyToManyField(CustomUser,related_name='bookmarked_events',blank=True)
     iu_id=models.ForeignKey(IUMaster,related_name='eventdetails_iu',on_delete = models.CASCADE)
 
     class Meta:
@@ -43,5 +44,3 @@ class EventBookingDetails(BaseModel):
     class Meta:
         db_table='event_booking_details'
         ordering = ['created_at'] 
-
-
