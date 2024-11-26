@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from datetime import datetime,timedelta
+from datetime import datetime
 from django.utils.dateformat import format as date_format
 from django.utils import timezone
 from rest_framework.views import APIView,status
@@ -230,7 +230,6 @@ class EventApproval(APIView):
         event=EventMaster.objects.get(name=template.template_name,iu_id=iu_obj,is_active=True)
         event_approved_status=request.data.get('event_status')
         template_message=template.content.format(event_obj.name,event_approved_status)
-        print(template_message)
         message="Your Event Approval"
     
         domain = request.get_host()  # Example: '127.0.0.1:8000'
@@ -260,8 +259,6 @@ class EventApproval(APIView):
             print(notification_data)
 
 
-        # transaction.commit()
-        return Response({"status":"success","message":"User details updated successfully"})
         transaction.commit()
         return Response({"status":"success","message":"Event details updated successfully"})
 

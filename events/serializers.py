@@ -11,7 +11,7 @@ class GetEventDetailsSerializer(serializers.ModelSerializer):
     user_profile = serializers.SerializerMethodField()
     class Meta:
         model = EventDetails
-        fields = ['id','event_organizer','name','description','event_date','event_amount','event_member_limit','refund_applicable','payment_needed','longitude','latitude','address','user_profile']
+        fields = ['id','event_organizer','name','description','event_date','event_amount','event_member_limit','refund_applicable','payment_needed','longitude','latitude','address','instructions','inclusions','user_profile']
 
     def get_user_profile(self, obj):
         profile = obj.event_organizer.userdetails.first()
@@ -36,14 +36,16 @@ class GetEventBookingDetailsSerializer(serializers.ModelSerializer):
     event_latitude = serializers.CharField(source='event.latitude', default=None)
     event_address = serializers.CharField(source='event.address', default=None)
     count_down=serializers.SerializerMethodField()
+    instructions=serializers.SerializerMethodField()
+    inclusions=serializers.SerializerMethodField()
     class Meta:
         model = EventBookingDetails
-        fields = ['id', 'no_of_tickets', 'booking_status', 'payment_status','event_detail_status', 'total_ticket_price', 'booking_date','event_name','event_amount','event_longitude','event_latitude','event_address','count_down','user_profile','event_organizer']
+        fields = ['id', 'no_of_tickets', 'booking_status', 'payment_status','event_detail_status', 'total_ticket_price', 'booking_date','event_name','event_amount','event_longitude','event_latitude','event_address','count_down','instructions','inclusions','user_profile','event_organizer']
 
     def get_count_down(self,obj):
-        cur_date = timezone.now()
+        current_date = timezone.now()
         event_date=obj.event.event_date
-        count=event_date-cur_date
+        count=event_date-current_date
         if count.days<1:
             return 0
         return count.days
@@ -59,7 +61,14 @@ class GetEventBookingDetailsSerializer(serializers.ModelSerializer):
             return "upcoming"
         else:
             return "completed"
+        
+    def get_instructions(self,obj):
+        return obj.event.instructions
     
+    def get_inclusions(self,obj):
+        return obj.event.inclusions
+
+
     def get_total_ticket_price(self, obj):
         return obj.total
 
