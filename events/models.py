@@ -17,7 +17,8 @@ class EventDetails(BaseModel):
     latitude = models.CharField(max_length=20, null=True, blank=True)
     address = models.TextField()
     event_status = models.CharField(default='pending',max_length=50)
-    bookmark = models.ManyToManyField(CustomUser,related_name='bookmarked_events',blank=True)
+    instructions=models.TextField(blank=True,null=True)
+    inclusions=models.TextField(blank=True,null=True)
     iu_id=models.ForeignKey(IUMaster,related_name='eventdetails_iu',on_delete = models.CASCADE)
 
     class Meta:
@@ -44,3 +45,13 @@ class EventBookingDetails(BaseModel):
     class Meta:
         db_table='event_booking_details'
         ordering = ['created_at'] 
+
+class BookmarkDetails(BaseModel):
+    user = models.ForeignKey(CustomUser,on_delete=models.CASCADE,related_name='bookmark_user')
+    event = models.ForeignKey(EventDetails,on_delete=models.CASCADE,related_name='bookmark_event')
+    is_bookmarked = models.BooleanField(default=True)
+    iu_id = models.ForeignKey(IUMaster, on_delete=models.CASCADE, related_name='bookmark_iu')
+
+    class Meta:
+        db_table = 'bookmarkdetails'
+        ordering = ['created_at']
