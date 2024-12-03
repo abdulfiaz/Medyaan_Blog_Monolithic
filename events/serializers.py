@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from events.models import EventDetails,EventBookingDetails,BookmarkDetails
+from events.models import EventDetails,EventBookingDetails,EventBookmarkDetails
 from django.utils import timezone
 
 class EventDetailsSerializer(serializers.ModelSerializer):
@@ -90,5 +90,5 @@ class GetEventBookingDetailsSerializer(serializers.ModelSerializer):
 class BookmarkDetailsSerializers(serializers.ModelSerializer):
     event_details = GetEventDetailsSerializer(source='event', read_only=True)
     class Meta:
-        model = BookmarkDetails
+        model = EventBookmarkDetails
         fields = ['event_details']

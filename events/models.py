@@ -2,12 +2,13 @@ from django.db import models
 from adminapp.models import BaseModel,IUMaster
 from users.models import CustomUser
 from django.contrib.postgres.fields import JSONField,ArrayField
+from django.utils import timezone
 
 class EventDetails(BaseModel):
     name = models.CharField(max_length=50)
     description = models.CharField(max_length = 300,null=True,blank=True)
     event_organizer = models.ForeignKey(CustomUser,on_delete=models.CASCADE,related_name='event_organizer_id')
-    event_date = models.DateTimeField()
+    event_date = models.DateTimeField(null=True)
     payment_needed = models.BooleanField(default=False)
     event_amount = models.DecimalField(max_digits=10, decimal_places=3,default=0)
     event_member_limit = models.IntegerField()
@@ -36,6 +37,8 @@ class EventBookingDetails(BaseModel):
     payment_status = models.BooleanField(default=False) #false means unpaid and true meand paid
     booking_status = models.CharField(default='confirmed',max_length=20)
     cancellation_reason = models.CharField(max_length=100,null=True,blank=True)
+    cancelled_by = models.CharField(max_length=15,blank=True,null=True)
+    cancelled_at = models.DateTimeField(null=True)
     refund_status = models.CharField(default='pending',max_length=20)
     is_archived = models.BooleanField(default=False)
     vat = models.DecimalField(max_digits=10, decimal_places=2,default=0)
