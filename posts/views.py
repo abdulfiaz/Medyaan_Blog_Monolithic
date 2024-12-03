@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from datetime import datetime,timedelta
 from rest_framework.views import APIView,status
 from rest_framework.response import Response
 from posts.serializers import *
@@ -14,6 +15,7 @@ from rest_framework.decorators import api_view, parser_classes
 from django.template.loader import render_to_string
 from notification.models import TemplateMaster,EventMaster
 from adminapp.utils import get_notification
+from django.db.models import Count,F
 
 
 @api_view(['POST'])
@@ -521,3 +523,62 @@ class ShareAPi(APIView):
         except Exception as e:
             return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
 
+# publisher dashboard api
+
+class PublisherDashboard(APIView):
+    def get_highest_posts(self, posts):
+        return {
+            "highest_liked_post_id": self.get_post_id(posts, 'likes_users_list'),
+            "highest_liked_post_count": self.get_post_count(posts, 'likes_users_list'),
+            "highest_viewed_post_id": self.get_post_id(posts, 'viewed_users_list'),
+            "highest_viewed_post_count": self.get_post_count(posts, 'viewed_users_list'),
+            "highest_shared_post": self.get_post_id(posts, 'shared_users_list'),
+            "highest_shared_post_count": self.get_post_count(posts, 'shared_users_list'),
+            "highest_commented_post": self.get_post_id(posts, 'comments_users_list'),
+            "highest_commented_post_count": self.get_post_count(posts, 'comments_users_list'),
+        }
+
+    def get_post_id(self, posts, field):
+        post = posts.annotate(count=Count(field)).order_by('-count').first()
+        return post.id if post else None
+
+    def get_post_count(self, posts, field):
+        post = posts.annotate(count=Count(field)).order_by('-count').first()
+        return post.count if post else 0
+
+    def filter_posts_by_date(self, posts, start_date):
+        return posts.filter(created_at__gte=start_date)
+
+    def get(self, request):
+        domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+        iu_obj = get_iuobj(domain)
+        if not iu_obj:
+            return Response({"status": "error", "message": "IU not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        user_role = get_user_roles(request) 
+        if user_role != 'publisher':
+            return Response({"status": "error", "message": "You are unauthorized to do this action!"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        post_obj = PostDetails.objects.filter(publisher=request.user.id, is_active=True, iu_id=iu_obj)
+        total_post_count = post_obj.count()
+
+        categories_with_counts = list(post_obj.values('category').annotate(category_name=F('category__category_name'), post_count=Count('id')).order_by('category_id'))
+
+        now = timezone.now()
+        weekly_posts = self.filter_posts_by_date(post_obj, now - timedelta(days=now.weekday()))
+        monthly_posts = self.filter_posts_by_date(post_obj, now.replace(day=1))
+        yearly_posts = self.filter_posts_by_date(post_obj, now.replace(month=1, day=1))
+
+        weekly_data = self.get_highest_posts(weekly_posts)
+        monthly_data = self.get_highest_posts(monthly_posts)
+        yearly_data = self.get_highest_posts(yearly_posts)
+
+        return Response({
+            "status": "success",
+            "message": "Data retrieved successfully",
+            "total_post_count": total_post_count,
+            "category_counts": categories_with_counts,
+            "weekly_post_report": weekly_data,
+            "monthly_post_reports": monthly_data,
+            "yearly_posts_reports": yearly_data,
+        }, status=status.HTTP_200_OK)

@@ -119,8 +119,6 @@ class RoleMasterCreateView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-
-
 class CreateCustomUserView(APIView):
     def get(self, request):
         user=request.user
@@ -148,7 +146,6 @@ class CreateCustomUserView(APIView):
     def post(self, request):
         role_name = request.data.get('role_type', 'consumer')
         user_role = get_user_roles(request)
-        print(user_role)
         domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
 
         iu_obj = get_iuobj(domain)

@@ -101,7 +101,8 @@ INSTALLED_APPS = [
     'events',
     'posts',
     'users',
-    'notification'
+    'notification',
+    'reports'
 ]
 
 # jwt setup

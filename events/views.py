@@ -16,7 +16,13 @@ from django.template.loader import render_to_string
 from notification.models import TemplateMaster,EventMaster
 from adminapp.utils import get_notification
 from sdd_blog import settings
-
+from django.http import HttpResponse, JsonResponse
+from django.utils.timezone import now
+from openpyxl import Workbook
+from openpyxl.chart import PieChart, Reference
+from django.views import View
+from django.db.models import Count
+from collections import defaultdict
 
 class EventDetailsView(APIView): 
     def get(self,request):
@@ -60,8 +66,14 @@ class EventDetailsView(APIView):
 
             event_list = []
             for event in events:
+                try:
+                    bookmark = BookmarkDetails.objects.get( user=request.user, event=event, is_bookmarked=True)
+                    is_bookmarked = True  
+                except BookmarkDetails.DoesNotExist:
+                    is_bookmarked = False 
                 event_data = GetEventDetailsSerializer(event).data
                 event_data['event_detailed_status'] = 'upcoming' if event.event_date > timezone.now() else 'completed'
+                event_data['is_bookmarked'] = is_bookmarked 
                 event_list.append(event_data)
 
             return Response({"status": "success", "message": "Events retrieved successfully", "data": event_list},status=status.HTTP_200_OK)
@@ -303,6 +315,8 @@ class EventBookingDetailsView(APIView):
         if not iu_obj :
             return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)  
         
+        if no_of_tickets == 0:
+            return Response({"status":"error","message":"Number of tickets required !"},status=status.HTTP_400_BAD_REQUEST)
         if not event_id:
             return Response({"status":"error","message":"event id is required"},status=status.HTTP_400_BAD_REQUEST)
         
@@ -380,54 +394,50 @@ class EventBookingDetailsView(APIView):
 class BookmarkView(APIView):
     def get(self,request):
         try:
-            event_id = request.query_params.get('event_id')
+            user=request.user
             
             domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
 
-            user_role = get_user_roles(request)
-            if user_role != 'eventorganiser':
-                return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
-        
             if not iu_obj:
                 return Response({"status": "error", "message": "Unauthorized domain"}, status=status.HTTP_401_UNAUTHORIZED)
             
             try:
-                event_obj = EventDetails.objects.get(id=event_id,is_active=True,event_status='published',iu_id=iu_obj,event_organizer=request.user)
+                bookmark_obj = BookmarkDetails.objects.filter(user=user.id, is_bookmarked=True, iu_id=iu_obj, is_active=True).select_related('event')
             except EventDetails.DoesNotExist:
                 return Response({"status":"error","message":"Event Details doesnt exists!"},status=status.HTTP_404_NOT_FOUND)
-            user_obj=GetCustomUserSerializer(event_obj.bookmark.all(),many=True)
-            total_count=event_obj.bookmark.count()
+            user_obj=BookmarkDetailsSerializers(bookmark_obj,many=True)
 
-            return Response({"status":"success","message":user_obj.data,"total_count":total_count})
+            return Response({"status":"success","message":user_obj.data})
         except Exception as e:
             return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
 
-
-    def put(self,request):
+    def put(self, request):
         try:
-            event_id = request.data.get('event_id')
-            domain = request.META.get('HTTP_ORIGIN', settings.APPLICATION_HOST)
+            event_id = request.data.get("event_id")
+            domain = request.META.get("HTTP_ORIGIN", settings.APPLICATION_HOST)
             iu_obj = get_iuobj(domain)
-            user_role=get_user_roles(request)
 
-            if not iu_obj :
-                return Response({"status":"error","message":"Unauthorized domain"},status=status.HTTP_401_UNAUTHORIZED)
+            if not iu_obj:
+                return Response({"status": "error", "message": "Unauthorized domain"}, status=status.HTTP_401_UNAUTHORIZED)
             
-            if user_role != 'consumer':
-                return Response({"status":"error","message":"You are unauthorized to do this action!"},status=status.HTTP_401_UNAUTHORIZED)
+            try:
+                event_obj = EventDetails.objects.get(id=event_id,event_date__gt=timezone.now(), is_active=True, iu_id=iu_obj)
+            except EventDetails.DoesNotExist:
+                return Response({"status": "error", "message": "Event not found"}, status=status.HTTP_404_NOT_FOUND)
             
-            event_obj = EventDetails.objects.get(id=event_id,is_active=True,iu_id=iu_obj,is_archived=False,event_status='published')
-            bookmark_obj=event_obj.bookmark.filter(id=request.user.id).count()
+            try:
+                latest_bookmark = BookmarkDetails.objects.get(user=request.user,event=event_obj,iu_id=iu_obj,is_bookmarked=True)
+                latest_bookmark.is_bookmarked = False
+                latest_bookmark.modified_by = request.user.id
+                latest_bookmark.save()
+                message = "Bookmark removed successfully"
+            except BookmarkDetails.DoesNotExist:
+                    BookmarkDetails.objects.create(user=request.user,event=event_obj,is_bookmarked=True,iu_id=iu_obj,created_by=request.user.id)
+                    message = "Event bookmarked successfully"
 
-            if bookmark_obj>0:
-                event_obj.bookmark.remove(request.user)
-                return Response({"status":"success","message":"Bookmark removed successfully!"},status=status.HTTP_200_OK)
-            
-            event_obj.bookmark.add(request.user)
-            return Response({"status":"success","message":"Bookmark added successfully!"},status=status.HTTP_200_OK)
-        
+            return Response({"status": "success", "message": message}, status=status.HTTP_200_OK)
+
         except Exception as e:
-            return Response({"status":"error","message":str(e)},status=status.HTTP_400_BAD_REQUEST)
-            
-            
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)       
+

@@ -14,4 +14,5 @@ urlpatterns = [
     path('comments/',CommentsView.as_view(),name='insert Comments'),
     path('like/',LikeAPI.as_view()),
     path('share/',ShareAPi.as_view()),
+    path('publisher/dashboard/',PublisherDashboard.as_view())
 ]

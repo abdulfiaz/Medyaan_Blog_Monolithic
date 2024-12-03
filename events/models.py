@@ -4,21 +4,23 @@ from users.models import CustomUser
 from django.contrib.postgres.fields import JSONField,ArrayField
 
 class EventDetails(BaseModel):
-    name = models.CharField(max_length=20)
-    description = models.CharField(max_length = 100,null=True,blank=True)
+    name = models.CharField(max_length=50)
+    description = models.CharField(max_length = 300,null=True,blank=True)
     event_organizer = models.ForeignKey(CustomUser,on_delete=models.CASCADE,related_name='event_organizer_id')
     event_date = models.DateTimeField()
-    event_amount = models.DecimalField(max_digits=10, decimal_places=2,default=0)
-    event_member_limit = models.IntegerField()
-    refund_applicable = models.BooleanField(default=False)
     payment_needed = models.BooleanField(default=False)
-    is_archived = models.BooleanField(default=False)
+    event_amount = models.DecimalField(max_digits=10, decimal_places=3,default=0)
+    event_member_limit = models.IntegerField()
+    instructions=models.TextField(blank=True,null=True)
+    inclusions=models.TextField(blank=True,null=True)
+    is_refund_applicable = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
     longitude = models.CharField(max_length=20, null=True, blank=True)
     latitude = models.CharField(max_length=20, null=True, blank=True)
     address = models.TextField()
     event_status = models.CharField(default='pending',max_length=50)
-    instructions=models.TextField(blank=True,null=True)
-    inclusions=models.TextField(blank=True,null=True)
+    rejected_reason = models.CharField(max_length=50,blank=True,null=True)
+    
     iu_id=models.ForeignKey(IUMaster,related_name='eventdetails_iu',on_delete = models.CASCADE)
 
     class Meta:
@@ -46,12 +48,12 @@ class EventBookingDetails(BaseModel):
         db_table='event_booking_details'
         ordering = ['created_at'] 
 
-class BookmarkDetails(BaseModel):
+class EventBookmarkDetails(BaseModel):
     user = models.ForeignKey(CustomUser,on_delete=models.CASCADE,related_name='bookmark_user')
     event = models.ForeignKey(EventDetails,on_delete=models.CASCADE,related_name='bookmark_event')
-    is_bookmarked = models.BooleanField(default=True)
+    is_removed = models.BooleanField(default=False)
     iu_id = models.ForeignKey(IUMaster, on_delete=models.CASCADE, related_name='bookmark_iu')
 
     class Meta:
-        db_table = 'bookmarkdetails'
+        db_table = 'event_bookmark_details'
         ordering = ['created_at']

@@ -8,6 +8,6 @@ urlpatterns = [
     path('eventdetails/',EventDetailsView.as_view(),name='eventdetails'),
     path('approval/',EventApproval.as_view(),name='event_approval'),
     path('booking/',EventBookingDetailsView.as_view(),name='event_booking'),
-    path('bookmark/',BookmarkView.as_view(),name='event_bookmark')
+    path('bookmark/',BookmarkView.as_view(),name='event_bookmark'),
 
 ]

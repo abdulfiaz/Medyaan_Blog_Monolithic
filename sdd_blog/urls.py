@@ -22,6 +22,7 @@ urlpatterns = [
     path('users/api/', include('users.urls', namespace='users')),
     path('posts/api/', include('posts.urls', namespace='posts')),
     path('events/api/',include('events.urls',namespace='events')),
-    path('notification/api/',include('notification.urls',namespace='notification'))
+    path('notification/api/',include('notification.urls',namespace='notification')),
+    path('reports/api/',include('reports.urls',namespace='reports'))
 
 ]
